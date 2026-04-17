@@ -827,6 +827,27 @@ def eval_yn(expr, env: Env) -> Any:
                 raise LispError(f"match: 沒有匹配的模式：{yn_repr(val)}")
             continue
 
+        if head == sym('with-memory'):
+            # (with-memory name body...)
+            # 把這個 name 的歷史綁進環境，body 可以直接用 memory/conf/count
+            _, name_expr, *body = expr
+            mname   = str(eval_yn(name_expr, env))
+            history = _recall_all_with_decay(mname)
+            last    = history[-1] if history else []
+            mem_env = Env(outer=env)
+            mem_env[sym('memory')]       = history
+            mem_env[sym('memory-last')]  = last
+            mem_env[sym('memory-text')]  = last[0] if last else None
+            mem_env[sym('memory-conf')]  = last[1] if len(last) > 1 else 0.0
+            mem_env[sym('memory-count')] = len(history)
+            mem_env[sym('memory-avg-conf')] = (
+                sum(e[1] for e in history) / len(history) if history else 0.0
+            )
+            mem_env[sym('memory-name')]  = mname
+            env  = mem_env
+            expr = [sym('begin')] + body
+            continue
+
         if head == sym('import'):
             # (import "path")              → load into current env
             # (import "path" as name)      → load into namespace function
@@ -1367,6 +1388,8 @@ def _make_global_env() -> Env:
         sym('recall'): lambda name: _recall_with_decay(str(name)),
         # recall-all: 回傳所有 [text conf pinned?] 清單（已考慮衰退）
         sym('recall-all'): lambda name: _recall_all_with_decay(str(name)),
+        # recall-recent: 回傳最近 n 條
+        sym('recall-recent'): lambda name, n=5: _recall_all_with_decay(str(name))[-(int(n)):],
         # recall-confident: 回傳 conf >= threshold 的最新一條
         sym('recall-confident'): lambda name, threshold: next(
             (pair for pair in reversed(_recall_all_with_decay(str(name)))
@@ -1374,6 +1397,19 @@ def _make_global_env() -> Env:
              and pair[1] >= float(threshold)),
             []
         ),
+        # recall-avg-conf: 最近 n 條的平均 confidence（感受穩定程度）
+        sym('recall-avg-conf'): lambda name, n=5: (
+            lambda entries: sum(e[1] for e in entries) / len(entries)
+            if entries else 0.0
+        )(_recall_all_with_decay(str(name))[-(int(n)):]),
+        # recall-count: 共有幾條記憶
+        sym('recall-count'): lambda name: len(_recall_all_with_decay(str(name))),
+        # forget: 寫入一條低 conf 記憶，讓這個名字的印象淡化
+        sym('forget'): lambda name: _append_user(
+            str(name),
+            f'(note "{name}" "{datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S")}"'
+            f' "forgotten" 0.05)'
+        ) or None,
         sym('person-notes'): lambda name: [
             e[3] for e in _load_user_journal(str(name))
             if isinstance(e, list) and len(e) >= 4

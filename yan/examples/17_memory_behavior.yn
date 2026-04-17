@@ -1,0 +1,77 @@
+; 17_memory_behavior.yn
+;
+; 記憶影響行為。
+;
+; 這個範例展示：言不只記錄——記憶改變它接下來做什麼。
+; 每次執行，它的反應會因為歷史而不同。
+
+; ── 基本記憶操作 ─────────────────────────────────────────────
+
+; 記住一件事（名稱, 文字, 信心值）
+(remember "mood" "今天專注" 0.85)
+(remember "mood" "有點疲憊" 0.6)
+
+; 讀回來
+(define last-mood (recall "mood"))
+(display "上一個情緒記錄：")
+(display (car last-mood))
+(display "  信心：")
+(display (cadr last-mood))
+(newline)
+
+; ── 記憶影響行為 ─────────────────────────────────────────────
+
+; (with-memory name body...) 把歷史綁進環境
+; 在 body 裡可以直接用 memory、memory-conf、memory-count 等
+
+(with-memory "mood"
+  (cond
+    ((= memory-count 0)
+     (display "第一次見面。還不了解你。"))
+    ((< memory-avg-conf 0.5)
+     (display "你最近狀態不太穩。"))
+    ((> memory-avg-conf 0.8)
+     (display "你最近狀態不錯。"))
+    (else
+     (display "普通。")))
+  (newline))
+
+; ── 監控模式範例 ────────────────────────────────────────────
+
+(define (check-server latency-ms)
+  ; 記錄這次的狀態
+  (remember "server"
+    (if (> latency-ms 500) "latency:slow" "latency:ok")
+    (if (> latency-ms 500) 0.3 0.9))
+
+  ; 根據歷史決定要不要發警報
+  (with-memory "server"
+    (let ((slow-count
+           (length (filter
+             (lambda (e) (string-contains (car e) "slow"))
+             memory))))
+      (cond
+        ((>= slow-count 3)
+         (display "警報：連續多次延遲，需要處理。"))
+        ((> slow-count 0)
+         (display "注意：偶有延遲。"))
+        (else
+         (display "正常。")))
+      (newline))))
+
+(check-server 200)
+(check-server 600)
+(check-server 650)
+(check-server 100)
+
+; ── 情感衰退 ────────────────────────────────────────────────
+
+; 記憶的信心值會隨時間衰退（0.9/週）
+; (forget "name") 主動讓一段記憶淡化
+
+(display "\n信心值統計：")
+(display (recall-count "mood"))
+(display " 條記憶，平均信心 ")
+(display (round (* (recall-avg-conf "mood" 10) 100)))
+(display "%")
+(newline)
