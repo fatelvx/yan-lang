@@ -10,38 +10,34 @@
 
 ## 是什麼
 
-從「隨便寫一個程式，不用有目的」這句話開始的東西。
+大多數 Lisp 直譯器的存在是為了教學，或為了展示 Lisp 能有多小。
 
-核心是 **言（Yán）**——一個自己寫的 Lisp 直譯器。選 Lisp 是因為：幾百行程式碼能從零造出一個完整的計算宇宙。語法即資料，閉包即記憶，遞迴即時間。
+言不是這樣。它從「隨便寫一個程式，不用有目的」這句話開始，沿著「如果語言能記得自己呢」這個問題長出來。
 
-除了語言本身，這裡還有一些用語言生長出來的東西。
+它知道自己被執行過幾次。它知道距離上次多久了。它有 `maybe` 型別——不確定性不是錯誤，是值。它有元循環直譯器，用言執行言。整個直譯器不到 2000 行，可以讀完。
 
 ---
 
 ## 快速開始
 
 ```bash
-python -X utf8 yan/yan.py          # 進入 REPL
+python -X utf8 yan/yan.py          # REPL（第一次會說「第一次醒來」）
 python -X utf8 yan/yan.py file.yn  # 執行 .yn 檔案
 ```
 
-需要 Python 3.10+，無額外依賴（遊戲部分需要 `pygame`）。
+Python 3.10+，無額外依賴。
 
 ---
 
 ## 語言特性（v0.8.0）
 
-- Lambda calculus、閉包、遞迴
-- 尾呼叫最佳化（TCO）——深遞迴不爆 stack
-- 惰性串流、`do` 迴圈、named let
-- 模式匹配 `(match ...)`
-- `try / catch` 例外處理
-- Quasiquote、巨集 `define-macro`
-- `(maybe value confidence)` 不確定性型別
-- 自知：記得自己被執行幾次、活過多久、跑過什麼
-- **Python FFI**：`(py-import "os")`、`(py-call mod "method" args…)`
+- Lambda calculus、閉包、遞迴，尾呼叫最佳化（深遞迴不爆 stack）
+- 惰性串流、`do` 迴圈、named let、模式匹配、巨集
+- **`(maybe value confidence)`** — 不確定性作為第一公民
+- **自知**：`(times-run)`、`(age)`、`(my-history)`——它記得自己
+- **Python FFI**：`(py-import "os")`、`(py-call mod "method" args…)`——整個 Python 生態可用
 - **模組命名空間**：`(import "path.yn" as name)`
-- 標準庫（啟動時自動載入）：串列操作、字串工具、數學函式
+- 標準庫啟動時自動載入，無需手動 load
 
 ---
 
