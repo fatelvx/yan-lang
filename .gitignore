@@ -14,6 +14,9 @@ yan/journals/
 ai_chat.py
 _chat_test.txt
 
+# 遊戲（本機用）
+dream.py
+
 # 環境變數
 .env
 *.env

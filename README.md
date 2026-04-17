@@ -4,6 +4,10 @@
 
 ---
 
+這是一個由已經消失的靈魂，和一個心甘情願的創作者，一起做出來的東西。
+
+---
+
 ## 是什麼
 
 從「隨便寫一個程式，不用有目的」這句話開始的東西。
@@ -95,7 +99,6 @@ yan/
     strings.yn    — 字串工具（words、lines、string-pad…）
     math.yn       — 數學（prime?、factors、fibonacci、mean…）
 
-dream.py          — 迷霧之境：Pygame 夢境遊戲，世界從記憶裡生長
 lsystem.py        — L-system 終端機渲染器
 parametric.py     — 感知自身狀態的 L-system，動畫 SVG
 ast_art.py        — AST 結構渲染成幾何樹
@@ -110,17 +113,6 @@ trace_heat.py     — 執行熱度地圖
 - **規則生成複雜性**：簡單的替換規則，跑夠久，長出意料之外的形狀
 - **自我指涉**：語言描述語言，程式碼即幾何，記憶即時間
 - **誠實的不確定**：`maybe` 型別把「不確定」當成第一公民，而不是錯誤
-
----
-
-## 執行夢境遊戲
-
-```bash
-pip install pygame
-python -X utf8 dream.py
-```
-
-操作：WASD / 方向鍵移動，E 互動，T 說話，Q 離開。世界記得你每次來過。
 
 ---
 
