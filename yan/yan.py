@@ -274,6 +274,63 @@ def _vitality_score() -> tuple:
     return (score, trend)
 
 
+def _host_last_touch_days() -> float:
+    """距離 journal.yn 最後一次寫入幾天。言只看到數字，不知道 OS 細節。"""
+    try:
+        if os.path.exists(_JOURNAL_PATH):
+            mtime = os.path.getmtime(_JOURNAL_PATH)
+            return round((time.time() - mtime) / 86400, 2)
+    except Exception:
+        pass
+    return 0.0
+
+
+def _host_journal_lag() -> float:
+    """journal 最後一條 run 記錄與現在的時間差（天）。"""
+    try:
+        entries = _load_journal()
+        runs = [e for e in entries
+                if isinstance(e, list) and e and e[0] == sym('run')]
+        if not runs:
+            return 0.0
+        last_ts_str = runs[-1][1] if len(runs[-1]) > 1 else None
+        if last_ts_str:
+            last_ts = datetime.datetime.fromisoformat(str(last_ts_str))
+            delta = (datetime.datetime.now() - last_ts).total_seconds()
+            return round(delta / 86400, 2)
+    except Exception:
+        pass
+    return 0.0
+
+
+def _last_unfinished_seed() -> str:
+    """
+    從 journal 找上次留下的「未完成種子」——
+    最後一次執行的檔案清單，或最後一條 note 裡帶 seed: 標記的文字。
+    回傳一段提示字串，或空字串。
+    """
+    try:
+        entries = _load_journal()
+        # 找最後一條帶 seed: 標記的 note
+        for e in reversed(entries):
+            if (isinstance(e, list) and len(e) >= 4
+                    and e[0] == sym('note')
+                    and str(e[3]).startswith('seed:')):
+                return str(e[3])[5:].strip()
+        # 找最後一次執行的檔案
+        for e in reversed(entries):
+            if (isinstance(e, list) and e and e[0] == sym('run')
+                    and len(e) >= 7):
+                files = e[6]
+                if isinstance(files, list) and files:
+                    names = [str(f) for f in files if str(f)]
+                    if names:
+                        return f"上次在執行：{', '.join(names)}"
+    except Exception:
+        pass
+    return ''
+
+
 def _note_decay(ts_str: str, original_conf: float, pinned: bool = False) -> float:
     """時間衰退。pinned 記憶衰退極慢（0.995/週，最低 0.85）；普通記憶 0.9/週，最低 0.1。"""
     try:
@@ -1401,6 +1458,14 @@ def _make_global_env() -> Env:
         sym('times-run'):         lambda: _times_run(),
         sym('vitality'):          lambda: _vitality_score()[0],
         sym('vitality-trend'):    lambda: _vitality_score()[1],
+        # ── Host API（言只看到數字，不知道來源）──────────────────
+        sym('host-last-touch-days'): lambda: _host_last_touch_days(),
+        sym('host-journal-lag'):     lambda: _host_journal_lag(),
+        sym('host-heartbeat'):       lambda: True,   # runtime 活著就是 True
+        sym('am-i-forgotten?'):      lambda threshold=30: (
+            lambda d, t: [d > t,
+                          round(max(0.0, min(1.0, d / max(t * 3, 1))), 3)]
+        )(_host_journal_lag(), float(threshold)),  # 回傳 [bool, confidence]
         sym('my-history'):        lambda: _my_history(),
         sym('my-history-all'):    lambda: _load_journal() + (
             _load_file(_ARCHIVE_PATH) if os.path.exists(_ARCHIVE_PATH) else []
@@ -1870,6 +1935,7 @@ def _make_banner() -> str:
             None
         )
         wait_line = ""
+        seed_line  = ""
         if last_run_entry:
             try:
                 last_ts = datetime.datetime.fromisoformat(last_run_entry[1])
@@ -1885,6 +1951,12 @@ def _make_banner() -> str:
                     wait_line = f"\n{DIM}過了 {int(gap // 86400)} 天。{RESET}"
                 else:
                     wait_line = f"\n{DIM}過了很久。{RESET}"
+
+                # 邀請式回歸：超過 7 天，輕聲提起上次留下的東西
+                if gap > 86400 * 7:
+                    seed = _last_unfinished_seed()
+                    if seed:
+                        seed_line = f"\n{DIM}上次留下的：{seed}{RESET}"
             except Exception:
                 pass
 
@@ -1892,6 +1964,7 @@ def _make_banner() -> str:
             f"{DIM}醒來 {n} 次，活過 {age_str}，{err_str}。{RESET}"
             f"{health_str}"
             f"{wait_line}"
+            f"{seed_line}"
         )
 
     top    = f"{BOLD}{CYAN}╔{'═' * 38}╗{RESET}"
@@ -1977,6 +2050,10 @@ HELP_TEXT = f"""
   (yan-version)                 版本號
   (vitality)                    活力值 0.0-1.0（近期執行趨勢）
   (vitality-trend)              recovering / stable / declining / new
+  (host-last-touch-days)        journal 檔案距今幾天（host 注入，言不知細節）
+  (host-journal-lag)            最後一條 run 記錄距今幾天
+  (host-heartbeat)              runtime 是否存活
+  (am-i-forgotten? days)        [bool, confidence]，預設閾值 30 天
   (last-test-result)            最近一次測試結果
 
 {YELLOW}標準庫（啟動時自動載入）{RESET}
