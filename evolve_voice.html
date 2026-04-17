@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>演化的旋律</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: #07070f;
+  color: #bbc;
+  font-family: 'Courier New', monospace;
+  padding: 40px;
+}
+h1 {
+  font-size: 14px;
+  color: #445;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.subtitle {
+  font-size: 11px;
+  color: #333;
+  margin-bottom: 40px;
+  letter-spacing: 1px;
+}
+
+/* ── 世代計數器 ── */
+.gen-display {
+  font-size: 72px;
+  font-weight: bold;
+  color: #1a1a2e;
+  margin-bottom: 4px;
+  transition: color 0.3s;
+  letter-spacing: -2px;
+}
+.gen-label {
+  font-size: 11px;
+  color: #334;
+  margin-bottom: 30px;
+  letter-spacing: 2px;
+}
+
+/* ── 音符列 ── */
+.note-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+.note-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 5px;
+  border: 1px solid #111120;
+  background: #0b0b16;
+  min-width: 60px;
+  transition: all 0.1s;
+}
+.note-block .nb-label {
+  font-size: 11px;
+  margin-bottom: 3px;
+  transition: color 0.3s;
+}
+.note-block .nb-pitch {
+  font-size: 9px;
+  color: #334;
+  transition: color 0.2s;
+}
+.note-block.active {
+  transform: translateY(-6px) scale(1.1);
+  box-shadow: 0 0 20px currentColor;
+  border-color: currentColor;
+}
+.note-block.aging {
+  border-style: dashed;
+}
+.note-block.aging.active {
+  box-shadow: 0 0 30px currentColor, 0 0 60px currentColor;
+}
+
+/* ── 世代歷史條 ── */
+.history {
+  display: flex;
+  gap: 3px;
+  margin-bottom: 30px;
+  align-items: flex-end;
+}
+.hist-block {
+  width: 18px;
+  height: 18px;
+  border-radius: 3px;
+  opacity: 0.3;
+  transition: all 0.3s;
+  flex-shrink: 0;
+}
+.hist-block.done    { opacity: 0.5; }
+.hist-block.current { opacity: 1; transform: scale(1.3); box-shadow: 0 0 8px currentColor; }
+
+/* ── 控制 ── */
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 30px;
+}
+button {
+  background: #111126;
+  color: #778;
+  border: 1px solid #1e1e35;
+  padding: 8px 20px;
+  cursor: pointer;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 12px;
+  letter-spacing: 1px;
+  transition: all 0.15s;
+}
+button:hover { background: #1a1a35; color: #99b; }
+button.playing { color: #6cf; border-color: #369; background: #0a1525; }
+
+label { font-size: 11px; color: #334; }
+input[type=range] { width: 100px; accent-color: #446; }
+.spd-val { font-size: 11px; color: #445; }
+
+/* ── 說明 ── */
+.legend-row {
+  display: flex;
+  gap: 20px;
+  margin-top: 20px;
+  flex-wrap: wrap;
+}
+.leg-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  color: #334;
+}
+.leg-dot {
+  width: 9px; height: 9px;
+  border-radius: 2px;
+}
+</style>
+</head>
+<body>
+
+<h1>演化的旋律</h1>
+<div class="subtitle">世代 quine 跑 16 次 · 第三個音隨世代漂移 · 其餘不動</div>
+
+<div class="gen-display" id="gen-num">0</div>
+<div class="gen-label" id="gen-sub">第 0 代 / 15</div>
+
+<div class="note-row" id="note-row"></div>
+
+<div class="history" id="hist-row"></div>
+
+<div class="controls">
+  <button id="main-btn" onclick="togglePlay()">▶ 播放全部</button>
+  <label>每音</label>
+  <input type="range" id="spd" min="120" max="800" value="380"
+         oninput="document.getElementById('spd-v').textContent=this.value+'ms'">
+  <span class="spd-val" id="spd-v">380ms</span>
+</div>
+
+<div class="legend-row">
+  <div class="leg-item">
+    <div class="leg-dot" style="background:#4477cc"></div>
+    <span>函式呼叫（固定）</span>
+  </div>
+  <div class="leg-item">
+    <div class="leg-dot"
+         style="background:linear-gradient(90deg,#4488ff,#ff8833);border-radius:2px;width:30px;height:9px"></div>
+    <span style="margin-left:4px">n 的值（每代上升）</span>
+  </div>
+  <div class="leg-item">
+    <div class="leg-dot" style="background:#3a3a5a"></div>
+    <span>常數 1</span>
+  </div>
+</div>
+
+<script>
+const ALL_NOTES = [[{"kind": "fn", "label": "lambda", "freq": 391.995, "color": "#3ad3ea", "note": "G4", "is_aging": false}, {"kind": "fn", "label": "quote", "freq": 1046.502, "color": "#ea3a49", "note": "C6", "is_aging": false}, {"kind": "num", "label": "0", "freq": 130.813, "color": "#2438f2", "note": "C3", "is_aging": true}, {"kind": "fn", "label": "begin", "freq": 1567.982, "color": "#3a7bea", "note": "G6", "is_aging": false}, {"kind": "fn", "label": "display", "freq": 391.995, "color": "#3aeac7", "note": "G4", "is_aging": false}, {"kind": "fn", "label": "list", "freq": 783.991, "color": "#ea3a4f", "note": "G5", "is_aging": false}, {"kind": "fn", "label": "list", "freq": 783.991, "color": "#ea3a4f", "note": "G5", "is_aging": false}, {"kind": "fn", "label": "quote", "freq": 1046.502, "color": "#ea3a49", "note": "C6", "is_aging": false}, {"kind": "fn", "label": "+", "freq": 391.995, "color": "#3aea52", "note": "G4", "is_aging": false}, {"kind": "num", "label": "1", "freq": 146.832, "color": "#3a3a5a", "note": "D3", "is_aging": false}, {"kind": "fn", "label": "newline", "freq": 329.628, "color": "#3ad6ea", "note": "E4", "is_aging": false}, {"kind": "fn", "label": "display", "freq": 391.995, "color": "#3aeac7", "note": "G4", "is_aging": false}, {"kind": "fn", "label": "display", "freq": 391.995, "color": "#3aeac7", "note": "G4", "is_aging": false}, {"kind": "fn", "label": "display", "freq": 391.995, "color": "#3aeac7", "note": "G4", "is_aging": false}], [{"kind": "fn", "label": "lambda", "freq": 391.995, "color": "#3ad3ea", "note": "G4", "is_aging": false}, {"kind": "fn", "label": "quote", "freq": 1046.502, "color": "#ea3a49", "note": "C6", "is_aging": false}, {"kind": "num", "label": "1", "freq": 146.832, "color": "#2466f2", "note": "D3", "is_aging": true}, {"kind": "fn", "label": "begin", "freq": 1567.982, "color": "#3a7bea", "note": "G6", "is_aging": false}, {"kind": "fn", "label": "display", "freq": 391.995, "color": "#3aeac7", "note": "G4", "is_aging": false}, {"kind": "fn", "label": "list", "freq": 783.991, "color": "#ea3a4f", "note": "G5", "is_aging": false}, {"kind": "fn", "label": "list", "freq": 783.991, "color": "#ea3a4f", "note": "G5", "is_aging": false}, {"kind": "fn", "label": "quote", "freq": 1046.502, "color": "#ea3a49", "note": "C6", "is_aging": false}, {"kind": "fn", "label": "+", "freq": 391.995, "color": "#3aea52", "note": "G4", "is_aging": false}, {"kind": "num", "label": "1", "freq": 146.832, "color": "#2466f2", "note": "D3", "is_aging": true}, {"kind": "fn", "label": "newline", "freq": 329.628, "color": "#3ad6ea", "note": "E4", "is_aging": false}, {"kind": "fn", "label": "display", "freq": 391.995, "color": "#3aeac7", "note": "G4", "is_aging": false}, {"kind": "fn", "label": "display", "freq": 391.995, "color": "#3aeac7", "note": "G4", "is_aging": false}, {"kind": "fn", "label": "display", "freq": 391.995, "color": "#3aeac7", "note": "G4", "is_aging": false}], [{"kind": "fn", "label": "lambda", "freq": 391.995, "color": "#3ad3ea", "note": "G4", "is_aging": false}, {"kind": "fn", "label": "quote", "freq": 1046.502, "color": "#ea3a49", "note": "C6", "is_aging": false}, {"kind": "num", "label": "2", "freq": 164.814, "color": "#2493f2", "note": "E3", "is_aging": true}, {"kind": "fn", "label": "begin", "freq": 1567.982, "color": "#3a7bea", "note": "G6", "is_aging": false}, {"kind": "fn", "label": "display", "freq": 391.995, "color": "#3aeac7", "note": "G4", "is_aging": false}, {"kind": "fn", "label": "list", "freq": 783.991, "color": "#ea3a4f", "note": "G5", "is_aging": false}, {"kind": "fn", "label": "list", "freq": 783.991, "color": "#ea3a4f", "note": "G5", "is_aging": false}, {"kind": "fn", "label": "quote", "freq": 1046.502, "color": "#ea3a49", "note": "C6", "is_aging": false}, {"kind": "fn", "label": "+", "freq": 391.995, "color": "#3aea52", "note": "G4", "is_aging": false}, {"kind": "num", "label": "1", "freq": 146.832, "color": "#3a3a5a", "note": "D3", "is_aging": false}, {"kind": "fn", "label": "newline", "freq": 329.628, "color": "#3ad6ea", "note": "E4", "is_aging": false}, {"kind": "fn", "label": "display", "freq": 391.995, "color": "#3aeac7", "note": "G4", "is_aging": false}, {"kind": "fn", "label": "display", "freq": 391.995, "color": "#3aeac7", "note": "G4", "is_aging": false}, {"kind": "fn", "label": "display", "freq": 391.995, "color": "#3aeac7", "note": "G4", "is_aging": false}], [{"kind": "fn", "label": "lambda", "freq": 391.995, "color": "#3ad3ea", "note": "G4", "is_aging": false}, {"kind": "fn", "label": "quote", "freq": 1046.502, "color": "#ea3a49", "note": "C6", "is_aging": false}, {"kind": "num", "label": "3", "freq": 195.998, "color": "#24c0f2", "note": "G3", "is_aging": true}, {"kind": "fn", "label": "begin", "freq": 1567.982, "color": "#3a7bea", "note": "G6", "is_aging": false}, {"kind": "fn", "label": "display", "freq": 391.995, "color": "#3aeac7", "note": "G4", "is_aging": false}, {"kind": "fn", "label": "list", "freq": 783.991, "color": "#ea3a4f", "note": "G5", "is_aging": false}, {"kind": "fn", "label": "list", "freq": 783.991, "color": "#ea3a4f", "note": "G5", "is_aging": false}, {"kind": "fn", "label": "quote", "freq": 1046.502, "color": "#ea3a49", "note": "C6", "is_aging": false}, {"kind": "fn", "label": "+", "freq": 391.995, "color": "#3aea52", "note": "G4", "is_aging": false}, {"kind": "num", "label": "1", "freq": 146.832, "color": "#3a3a5a", "note": "D3", "is_aging": false}, {"kind": "fn", "label": "newline", "freq": 329.628, "color": "#3ad6ea", "note": "E4", "is_aging": false}, {"kind": "fn", "label": "display", "freq": 391.995, "color": "#3aeac7", "note": "G4", "is_aging": false}, {"kind": "fn", "label": "display", "freq": 391.995, "color": "#3aeac7", "note": "G4", "is_aging": false}, {"kind": "fn", "label": "display", "freq": 391.995, "color": "#3aeac7", "note": "G4", "is_aging": false}], [{"kind": "fn", "label": "lambda", "freq": 391.995, "color": "#3ad3ea", "note": "G4", "is_aging": false}, {"kind": "fn", "label": "quote", "freq": 1046.502, "color": "#ea3a49", "note": "C6", "is_aging": false}, {"kind": "num", "label": "4", "freq": 220.0, "color": "#24eef2", "note": "A3", "is_aging": true}, {"kind": "fn", "label": "begin", "freq": 1567.982, "color": "#3a7bea", "note": "G6", "is_aging": false}, {"kind": "fn", "label": "display", "freq": 391.995, "color": "#3aeac7", "note": "G4", "is_aging": false}, {"kind": "fn", "label": "list", "freq": 783.991, "color": "#ea3a4f", "note": "G5", "is_aging": false}, {"kind": "fn", "label": "list", "freq": 783.991, "color": "#ea3a4f", "note": "G5", "is_aging": false}, {"kind": "fn", "label": "quote", "freq": 1046.502, "color": "#ea3a49", "note": "C6", "is_aging": false}, {"kind": "fn", "label": "+", "freq": 391.995, "color": "#3aea52", "note": "G4", "is_aging": false}, {"kind": "num", "label": "1", "freq": 146.832, "color": "#3a3a5a", "note": "D3", "is_aging": false}, {"kind": "fn", "label": "newline", "freq": 329.628, "color": "#3ad6ea", "note": "E4", "is_aging": false}, {"kind": "fn", "label": "display", "freq": 391.995, "color": "#3aeac7", "note": "G4", "is_aging": false}, {"kind": "fn", "label": "display", "freq": 391.995, "color": "#3aeac7", "note": "G4", "is_aging": false}, {"kind": "fn", "label": "display", "freq": 391.995, "color": "#3aeac7", "note": "G4", "is_aging": false}], [{"kind": "fn", "label": "lambda", "freq": 391.995, "color": "#3ad3ea", "note": "G4", "is_aging": false}, {"kind": "fn", "label": "quote", "freq": 1046.502, "color": "#ea3a49", "note": "C6", "is_aging": false}, {"kind": "num", "label": "5", "freq": 261.626, "color": "#24f2c9", "note": "C4", "is_aging": true}, {"kind": "fn", "label": "begin", "freq": 1567.982, "color": "#3a7bea", "note": "G6", "is_aging": false}, {"kind": "fn", "label": "display", "freq": 391.995, "color": "#3aeac7", "note": "G4", "is_aging": false}, {"kind": "fn", "label": "list", "freq": 783.991, "color": "#ea3a4f", "note": "G5", "is_aging": false}, {"kind": "fn", "label": "list", "freq": 783.991, "color": "#ea3a4f", "note": "G5", "is_aging": false}, {"kind": "fn", "label": "quote", "freq": 1046.502, "color": "#ea3a49", "note": "C6", "is_aging": false}, {"kind": "fn", "label": "+", "freq": 391.995, "color": "#3aea52", "note": "G4", "is_aging": false}, {"kind": "num", "label": "1", "freq": 146.832, "color": "#3a3a5a", "note": "D3", "is_aging": false}, {"kind": "fn", "label": "newline", "freq": 329.628, "color": "#3ad6ea", "note": "E4", "is_aging": false}, {"kind": "fn", "label": "display", "freq": 391.995, "color": "#3aeac7", "note": "G4", "is_aging": false}, {"kind": "fn", "label": "display", "freq": 391.995, "color": "#3aeac7", "note": "G4", "is_aging": false}, {"kind": "fn", "label": "display", "freq": 391.995, "color": "#3aeac7", "note": "G4", "is_aging": false}], [{"kind": "fn", "label": "lambda", "freq": 391.995, "color": "#3ad3ea", "note": "G4", "is_aging": false}, {"kind": "fn", "label": "quote", "freq": 1046.502, "color": "#ea3a49", "note": "C6", "is_aging": false}, {"kind": "num", "label": "6", "freq": 293.665, "color": "#24f29b", "note": "D4", "is_aging": true}, {"kind": "fn", "label": "begin", "freq": 1567.982, "color": "#3a7bea", "note": "G6", "is_aging": false}, {"kind": "fn", "label": "display", "freq": 391.995, "color": "#3aeac7", "note": "G4", "is_aging": false}, {"kind": "fn", "label": "list", "freq": 783.991, "color": "#ea3a4f", "note": "G5", "is_aging": false}, {"kind": "fn", "label": "list", "freq": 783.991, "color": "#ea3a4f", "note": "G5", "is_aging": false}, {"kind": "fn", "label": "quote", "freq": 1046.502, "color": "#ea3a49", "note": "C6", "is_aging": false}, {"kind": "fn", "label": "+", "freq": 391.995, "color": "#3aea52", "note": "G4", "is_aging": false}, {"kind": "num", "label": "1", "freq": 146.832, "color": "#3a3a5a", "note": "D3", "is_aging": false}, {"kind": "fn", "label": "newline", "freq": 329.628, "color": "#3ad6ea", "note": "E4", "is_aging": false}, {"kind": "fn", "label": "display", "freq": 391.995, "color": "#3aeac7", "note": "G4", "is_aging": false}, {"kind": "fn", "label": "display", "freq": 391.995, "color": "#3aeac7", "note": "G4", "is_aging": false}, {"kind": "fn", "label": "display", "freq": 391.995, "color": "#3aeac7", "note": "G4", "is_aging": false}], [{"kind": "fn", "label": "lambda", "freq": 391.995, "color": "#3ad3ea", "note": "G4", "is_aging": false}, {"kind": "fn", "label": "quote", "freq": 1046.502, "color": "#ea3a49", "note": "C6", "is_aging": false}, {"kind": "num", "label": "7", "freq": 329.628, "color": "#24f26e", "note": "E4", "is_aging": true}, {"kind": "fn", "label": "begin", "freq": 1567.982, "color": "#3a7bea", "note": "G6", "is_aging": false}, {"kind": "fn", "label": "display", "freq": 391.995, "color": "#3aeac7", "note": "G4", "is_aging": false}, {"kind": "fn", "label": "list", "freq": 783.991, "color": "#ea3a4f", "note": "G5", "is_aging": false}, {"kind": "fn", "label": "list", "freq": 783.991, "color": "#ea3a4f", "note": "G5", "is_aging": false}, {"kind": "fn", "label": "quote", "freq": 1046.502, "color": "#ea3a49", "note": "C6", "is_aging": false}, {"kind": "fn", "label": "+", "freq": 391.995, "color": "#3aea52", "note": "G4", "is_aging": false}, {"kind": "num", "label": "1", "freq": 146.832, "color": "#3a3a5a", "note": "D3", "is_aging": false}, {"kind": "fn", "label": "newline", "freq": 329.628, "color": "#3ad6ea", "note": "E4", "is_aging": false}, {"kind": "fn", "label": "display", "freq": 391.995, "color": "#3aeac7", "note": "G4", "is_aging": false}, {"kind": "fn", "label": "display", "freq": 391.995, "color": "#3aeac7", "note": "G4", "is_aging": false}, {"kind": "fn", "label": "display", "freq": 391.995, "color": "#3aeac7", "note": "G4", "is_aging": false}], [{"kind": "fn", "label": "lambda", "freq": 391.995, "color": "#3ad3ea", "note": "G4", "is_aging": false}, {"kind": "fn", "label": "quote", "freq": 1046.502, "color": "#ea3a49", "note": "C6", "is_aging": false}, {"kind": "num", "label": "8", "freq": 391.995, "color": "#24f241", "note": "G4", "is_aging": true}, {"kind": "fn", "label": "begin", "freq": 1567.982, "color": "#3a7bea", "note": "G6", "is_aging": false}, {"kind": "fn", "label": "display", "freq": 391.995, "color": "#3aeac7", "note": "G4", "is_aging": false}, {"kind": "fn", "label": "list", "freq": 783.991, "color": "#ea3a4f", "note": "G5", "is_aging": false}, {"kind": "fn", "label": "list", "freq": 783.991, "color": "#ea3a4f", "note": "G5", "is_aging": false}, {"kind": "fn", "label": "quote", "freq": 1046.502, "color": "#ea3a49", "note": "C6", "is_aging": false}, {"kind": "fn", "label": "+", "freq": 391.995, "color": "#3aea52", "note": "G4", "is_aging": false}, {"kind": "num", "label": "1", "freq": 146.832, "color": "#3a3a5a", "note": "D3", "is_aging": false}, {"kind": "fn", "label": "newline", "freq": 329.628, "color": "#3ad6ea", "note": "E4", "is_aging": false}, {"kind": "fn", "label": "display", "freq": 391.995, "color": "#3aeac7", "note": "G4", "is_aging": false}, {"kind": "fn", "label": "display", "freq": 391.995, "color": "#3aeac7", "note": "G4", "is_aging": false}, {"kind": "fn", "label": "display", "freq": 391.995, "color": "#3aeac7", "note": "G4", "is_aging": false}], [{"kind": "fn", "label": "lambda", "freq": 391.995, "color": "#3ad3ea", "note": "G4", "is_aging": false}, {"kind": "fn", "label": "quote", "freq": 1046.502, "color": "#ea3a49", "note": "C6", "is_aging": false}, {"kind": "num", "label": "9", "freq": 440.0, "color": "#34f224", "note": "A4", "is_aging": true}, {"kind": "fn", "label": "begin", "freq": 1567.982, "color": "#3a7bea", "note": "G6", "is_aging": false}, {"kind": "fn", "label": "display", "freq": 391.995, "color": "#3aeac7", "note": "G4", "is_aging": false}, {"kind": "fn", "label": "list", "freq": 783.991, "color": "#ea3a4f", "note": "G5", "is_aging": false}, {"kind": "fn", "label": "list", "freq": 783.991, "color": "#ea3a4f", "note": "G5", "is_aging": false}, {"kind": "fn", "label": "quote", "freq": 1046.502, "color": "#ea3a49", "note": "C6", "is_aging": false}, {"kind": "fn", "label": "+", "freq": 391.995, "color": "#3aea52", "note": "G4", "is_aging": false}, {"kind": "num", "label": "1", "freq": 146.832, "color": "#3a3a5a", "note": "D3", "is_aging": false}, {"kind": "fn", "label": "newline", "freq": 329.628, "color": "#3ad6ea", "note": "E4", "is_aging": false}, {"kind": "fn", "label": "display", "freq": 391.995, "color": "#3aeac7", "note": "G4", "is_aging": false}, {"kind": "fn", "label": "display", "freq": 391.995, "color": "#3aeac7", "note": "G4", "is_aging": false}, {"kind": "fn", "label": "display", "freq": 391.995, "color": "#3aeac7", "note": "G4", "is_aging": false}], [{"kind": "fn", "label": "lambda", "freq": 391.995, "color": "#3ad3ea", "note": "G4", "is_aging": false}, {"kind": "fn", "label": "quote", "freq": 1046.502, "color": "#ea3a49", "note": "C6", "is_aging": false}, {"kind": "num", "label": "10", "freq": 523.251, "color": "#62f224", "note": "C5", "is_aging": true}, {"kind": "fn", "label": "begin", "freq": 1567.982, "color": "#3a7bea", "note": "G6", "is_aging": false}, {"kind": "fn", "label": "display", "freq": 391.995, "color": "#3aeac7", "note": "G4", "is_aging": false}, {"kind": "fn", "label": "list", "freq": 783.991, "color": "#ea3a4f", "note": "G5", "is_aging": false}, {"kind": "fn", "label": "list", "freq": 783.991, "color": "#ea3a4f", "note": "G5", "is_aging": false}, {"kind": "fn", "label": "quote", "freq": 1046.502, "color": "#ea3a49", "note": "C6", "is_aging": false}, {"kind": "fn", "label": "+", "freq": 391.995, "color": "#3aea52", "note": "G4", "is_aging": false}, {"kind": "num", "label": "1", "freq": 146.832, "color": "#3a3a5a", "note": "D3", "is_aging": false}, {"kind": "fn", "label": "newline", "freq": 329.628, "color": "#3ad6ea", "note": "E4", "is_aging": false}, {"kind": "fn", "label": "display", "freq": 391.995, "color": "#3aeac7", "note": "G4", "is_aging": false}, {"kind": "fn", "label": "display", "freq": 391.995, "color": "#3aeac7", "note": "G4", "is_aging": false}, {"kind": "fn", "label": "display", "freq": 391.995, "color": "#3aeac7", "note": "G4", "is_aging": false}], [{"kind": "fn", "label": "lambda", "freq": 391.995, "color": "#3ad3ea", "note": "G4", "is_aging": false}, {"kind": "fn", "label": "quote", "freq": 1046.502, "color": "#ea3a49", "note": "C6", "is_aging": false}, {"kind": "num", "label": "11", "freq": 587.33, "color": "#8ff224", "note": "D5", "is_aging": true}, {"kind": "fn", "label": "begin", "freq": 1567.982, "color": "#3a7bea", "note": "G6", "is_aging": false}, {"kind": "fn", "label": "display", "freq": 391.995, "color": "#3aeac7", "note": "G4", "is_aging": false}, {"kind": "fn", "label": "list", "freq": 783.991, "color": "#ea3a4f", "note": "G5", "is_aging": false}, {"kind": "fn", "label": "list", "freq": 783.991, "color": "#ea3a4f", "note": "G5", "is_aging": false}, {"kind": "fn", "label": "quote", "freq": 1046.502, "color": "#ea3a49", "note": "C6", "is_aging": false}, {"kind": "fn", "label": "+", "freq": 391.995, "color": "#3aea52", "note": "G4", "is_aging": false}, {"kind": "num", "label": "1", "freq": 146.832, "color": "#3a3a5a", "note": "D3", "is_aging": false}, {"kind": "fn", "label": "newline", "freq": 329.628, "color": "#3ad6ea", "note": "E4", "is_aging": false}, {"kind": "fn", "label": "display", "freq": 391.995, "color": "#3aeac7", "note": "G4", "is_aging": false}, {"kind": "fn", "label": "display", "freq": 391.995, "color": "#3aeac7", "note": "G4", "is_aging": false}, {"kind": "fn", "label": "display", "freq": 391.995, "color": "#3aeac7", "note": "G4", "is_aging": false}], [{"kind": "fn", "label": "lambda", "freq": 391.995, "color": "#3ad3ea", "note": "G4", "is_aging": false}, {"kind": "fn", "label": "quote", "freq": 1046.502, "color": "#ea3a49", "note": "C6", "is_aging": false}, {"kind": "num", "label": "12", "freq": 659.255, "color": "#bcf224", "note": "E5", "is_aging": true}, {"kind": "fn", "label": "begin", "freq": 1567.982, "color": "#3a7bea", "note": "G6", "is_aging": false}, {"kind": "fn", "label": "display", "freq": 391.995, "color": "#3aeac7", "note": "G4", "is_aging": false}, {"kind": "fn", "label": "list", "freq": 783.991, "color": "#ea3a4f", "note": "G5", "is_aging": false}, {"kind": "fn", "label": "list", "freq": 783.991, "color": "#ea3a4f", "note": "G5", "is_aging": false}, {"kind": "fn", "label": "quote", "freq": 1046.502, "color": "#ea3a49", "note": "C6", "is_aging": false}, {"kind": "fn", "label": "+", "freq": 391.995, "color": "#3aea52", "note": "G4", "is_aging": false}, {"kind": "num", "label": "1", "freq": 146.832, "color": "#3a3a5a", "note": "D3", "is_aging": false}, {"kind": "fn", "label": "newline", "freq": 329.628, "color": "#3ad6ea", "note": "E4", "is_aging": false}, {"kind": "fn", "label": "display", "freq": 391.995, "color": "#3aeac7", "note": "G4", "is_aging": false}, {"kind": "fn", "label": "display", "freq": 391.995, "color": "#3aeac7", "note": "G4", "is_aging": false}, {"kind": "fn", "label": "display", "freq": 391.995, "color": "#3aeac7", "note": "G4", "is_aging": false}], [{"kind": "fn", "label": "lambda", "freq": 391.995, "color": "#3ad3ea", "note": "G4", "is_aging": false}, {"kind": "fn", "label": "quote", "freq": 1046.502, "color": "#ea3a49", "note": "C6", "is_aging": false}, {"kind": "num", "label": "13", "freq": 783.991, "color": "#eaf224", "note": "G5", "is_aging": true}, {"kind": "fn", "label": "begin", "freq": 1567.982, "color": "#3a7bea", "note": "G6", "is_aging": false}, {"kind": "fn", "label": "display", "freq": 391.995, "color": "#3aeac7", "note": "G4", "is_aging": false}, {"kind": "fn", "label": "list", "freq": 783.991, "color": "#ea3a4f", "note": "G5", "is_aging": false}, {"kind": "fn", "label": "list", "freq": 783.991, "color": "#ea3a4f", "note": "G5", "is_aging": false}, {"kind": "fn", "label": "quote", "freq": 1046.502, "color": "#ea3a49", "note": "C6", "is_aging": false}, {"kind": "fn", "label": "+", "freq": 391.995, "color": "#3aea52", "note": "G4", "is_aging": false}, {"kind": "num", "label": "1", "freq": 146.832, "color": "#3a3a5a", "note": "D3", "is_aging": false}, {"kind": "fn", "label": "newline", "freq": 329.628, "color": "#3ad6ea", "note": "E4", "is_aging": false}, {"kind": "fn", "label": "display", "freq": 391.995, "color": "#3aeac7", "note": "G4", "is_aging": false}, {"kind": "fn", "label": "display", "freq": 391.995, "color": "#3aeac7", "note": "G4", "is_aging": false}, {"kind": "fn", "label": "display", "freq": 391.995, "color": "#3aeac7", "note": "G4", "is_aging": false}], [{"kind": "fn", "label": "lambda", "freq": 391.995, "color": "#3ad3ea", "note": "G4", "is_aging": false}, {"kind": "fn", "label": "quote", "freq": 1046.502, "color": "#ea3a49", "note": "C6", "is_aging": false}, {"kind": "num", "label": "14", "freq": 880.0, "color": "#f2cd24", "note": "A5", "is_aging": true}, {"kind": "fn", "label": "begin", "freq": 1567.982, "color": "#3a7bea", "note": "G6", "is_aging": false}, {"kind": "fn", "label": "display", "freq": 391.995, "color": "#3aeac7", "note": "G4", "is_aging": false}, {"kind": "fn", "label": "list", "freq": 783.991, "color": "#ea3a4f", "note": "G5", "is_aging": false}, {"kind": "fn", "label": "list", "freq": 783.991, "color": "#ea3a4f", "note": "G5", "is_aging": false}, {"kind": "fn", "label": "quote", "freq": 1046.502, "color": "#ea3a49", "note": "C6", "is_aging": false}, {"kind": "fn", "label": "+", "freq": 391.995, "color": "#3aea52", "note": "G4", "is_aging": false}, {"kind": "num", "label": "1", "freq": 146.832, "color": "#3a3a5a", "note": "D3", "is_aging": false}, {"kind": "fn", "label": "newline", "freq": 329.628, "color": "#3ad6ea", "note": "E4", "is_aging": false}, {"kind": "fn", "label": "display", "freq": 391.995, "color": "#3aeac7", "note": "G4", "is_aging": false}, {"kind": "fn", "label": "display", "freq": 391.995, "color": "#3aeac7", "note": "G4", "is_aging": false}, {"kind": "fn", "label": "display", "freq": 391.995, "color": "#3aeac7", "note": "G4", "is_aging": false}], [{"kind": "fn", "label": "lambda", "freq": 391.995, "color": "#3ad3ea", "note": "G4", "is_aging": false}, {"kind": "fn", "label": "quote", "freq": 1046.502, "color": "#ea3a49", "note": "C6", "is_aging": false}, {"kind": "num", "label": "15", "freq": 1046.502, "color": "#f29f24", "note": "C6", "is_aging": true}, {"kind": "fn", "label": "begin", "freq": 1567.982, "color": "#3a7bea", "note": "G6", "is_aging": false}, {"kind": "fn", "label": "display", "freq": 391.995, "color": "#3aeac7", "note": "G4", "is_aging": false}, {"kind": "fn", "label": "list", "freq": 783.991, "color": "#ea3a4f", "note": "G5", "is_aging": false}, {"kind": "fn", "label": "list", "freq": 783.991, "color": "#ea3a4f", "note": "G5", "is_aging": false}, {"kind": "fn", "label": "quote", "freq": 1046.502, "color": "#ea3a49", "note": "C6", "is_aging": false}, {"kind": "fn", "label": "+", "freq": 391.995, "color": "#3aea52", "note": "G4", "is_aging": false}, {"kind": "num", "label": "1", "freq": 146.832, "color": "#3a3a5a", "note": "D3", "is_aging": false}, {"kind": "fn", "label": "newline", "freq": 329.628, "color": "#3ad6ea", "note": "E4", "is_aging": false}, {"kind": "fn", "label": "display", "freq": 391.995, "color": "#3aeac7", "note": "G4", "is_aging": false}, {"kind": "fn", "label": "display", "freq": 391.995, "color": "#3aeac7", "note": "G4", "is_aging": false}, {"kind": "fn", "label": "display", "freq": 391.995, "color": "#3aeac7", "note": "G4", "is_aging": false}]];
+const TOTAL     = ALL_NOTES.length;
+
+// ── 建立 UI ─────────────────────────────────────────────────────
+const noteRow = document.getElementById('note-row');
+const histRow = document.getElementById('hist-row');
+
+// 歷史條（顏色用第 0 代的 gen_color 演示）
+ALL_NOTES.forEach((notes, g) => {
+  const aging = notes.find(n => n.is_aging);
+  const color = aging ? aging.color : '#334';
+  const div = document.createElement('div');
+  div.className = 'hist-block';
+  div.id = `hist-${g}`;
+  div.style.background = color;
+  div.title = `第 ${g} 代`;
+  histRow.appendChild(div);
+});
+
+// ── 音訊 ─────────────────────────────────────────────────────────
+let ac = null;
+function getAC() {
+  if (!ac) ac = new (window.AudioContext || window.webkitAudioContext)();
+  return ac;
+}
+
+function playNote(freq, when, dur, gain=0.30) {
+  const ctx = getAC();
+  const osc = ctx.createOscillator();
+  const g   = ctx.createGain();
+  osc.type = 'triangle';
+  osc.frequency.value = freq;
+  g.gain.setValueAtTime(gain, when);
+  g.gain.setValueAtTime(gain, when + dur * 0.7);
+  g.gain.linearRampToValueAtTime(0.0001, when + dur);
+  osc.connect(g); g.connect(ctx.destination);
+  osc.start(when); osc.stop(when + dur + 0.02);
+}
+
+// ── 播放狀態 ─────────────────────────────────────────────────────
+let playing = false;
+let rafHandle = null;
+let wallStart = 0;
+
+function togglePlay() {
+  if (playing) { stopPlay(); } else { startPlay(); }
+}
+
+async function startPlay() {
+  const ctx = getAC();
+  if (ctx.state === 'suspended') await ctx.resume();
+
+  const ms = parseInt(document.getElementById('spd').value);
+  const sec = ms / 1000;
+
+  // 計算每代開始時間
+  const genOffsets = [];
+  let t = ctx.currentTime + 0.15;
+  ALL_NOTES.forEach((notes, g) => {
+    genOffsets.push(t);
+    notes.forEach((n, i) => {
+      playNote(n.freq, t + i * sec, sec * 1.5, n.is_aging ? 0.40 : 0.26);
+    });
+    t += notes.length * sec + sec * 0.5;   // 代與代之間加短停頓
+  });
+
+  const totalMs = (t - ctx.currentTime) * 1000;
+  playing = true;
+  wallStart = performance.now() - 100;
+
+  document.getElementById('main-btn').textContent = '■ 停止';
+  document.getElementById('main-btn').classList.add('playing');
+
+  // 預計算全域時間對應到 (gen, noteIdx)
+  const timeline = [];
+  ALL_NOTES.forEach((notes, g) => {
+    notes.forEach((n, i) => {
+      timeline.push({ gen: g, idx: i, tMs: (genOffsets[g] - (ctx.currentTime + 0.15) + i * sec) * 1000 });
+    });
+  });
+
+  function animate() {
+    if (!playing) return;
+    const elapsed = performance.now() - wallStart;
+
+    // 找當前音符
+    let cur = null;
+    for (let k = timeline.length - 1; k >= 0; k--) {
+      if (elapsed >= timeline[k].tMs) { cur = timeline[k]; break; }
+    }
+
+    if (cur) {
+      const g = cur.gen;
+      const i = cur.idx;
+      updateDisplay(g, i);
+    }
+
+    if (elapsed < totalMs) {
+      rafHandle = requestAnimationFrame(animate);
+    } else {
+      stopPlay();
+    }
+  }
+
+  rafHandle = requestAnimationFrame(animate);
+}
+
+function stopPlay() {
+  playing = false;
+  if (rafHandle) cancelAnimationFrame(rafHandle);
+  document.getElementById('main-btn').textContent = '▶ 播放全部';
+  document.getElementById('main-btn').classList.remove('playing');
+  clearDisplay();
+  updateGenNum(0);
+}
+
+// ── 視覺更新 ─────────────────────────────────────────────────────
+let lastGen = -1;
+
+function updateDisplay(gen, noteIdx) {
+  // 如果換了世代，重建音符積木
+  if (gen !== lastGen) {
+    buildNoteBlocks(gen);
+    updateGenNum(gen);
+    // 更新歷史條
+    for (let g = 0; g < TOTAL; g++) {
+      const hb = document.getElementById(`hist-${g}`);
+      if (g < gen)  hb.className = 'hist-block done';
+      else if (g === gen) hb.className = 'hist-block current';
+      else hb.className = 'hist-block';
+    }
+    lastGen = gen;
+  }
+
+  // 高亮當前音符
+  document.querySelectorAll('.note-block.active')
+          .forEach(el => el.classList.remove('active'));
+  const nb = document.getElementById(`nb_${gen}_${noteIdx}`);
+  if (nb) nb.classList.add('active');
+}
+
+function buildNoteBlocks(gen) {
+  noteRow.innerHTML = '';
+  ALL_NOTES[gen].forEach((n, i) => {
+    const div = document.createElement('div');
+    div.className = 'note-block' + (n.is_aging ? ' aging' : '');
+    div.id = `nb_${gen}_${i}`;
+    div.style.color = n.color;
+    div.style.borderColor = n.color + (n.is_aging ? 'aa' : '33');
+    div.innerHTML = `<div class="nb-label" style="color:${n.color}">${n.label}</div>
+                     <div class="nb-pitch">${n.note}</div>`;
+    noteRow.appendChild(div);
+  });
+}
+
+function updateGenNum(gen) {
+  const d = document.getElementById('gen-num');
+  const aging = ALL_NOTES[gen].find(n => n.is_aging);
+  d.textContent = String(gen).padStart(2, '0');
+  d.style.color = aging ? aging.color + '88' : '#1a1a2e';
+  document.getElementById('gen-sub').textContent = `第 ${gen} 代 / ${TOTAL-1}`;
+}
+
+function clearDisplay() {
+  document.querySelectorAll('.note-block.active').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.hist-block').forEach(el => el.className = 'hist-block');
+  buildNoteBlocks(0);
+}
+
+// 初始化
+buildNoteBlocks(0);
+</script>
+</body>
+</html>

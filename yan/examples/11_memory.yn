@@ -1,0 +1,128 @@
+; 11_memory.yn — 言讀自己的歷史
+;
+; 這個程式查詢 journal.yn——
+; 那個檔案是言自己的語法，記錄著每次執行的痕跡。
+; 言用自己的工具來理解自己的過去。
+
+(display "\n言的記憶\n")
+(display "══════════════════════\n\n")
+
+; ── 基本事實 ──────────────────────────────────────────────────
+
+(display "跑過幾次：      ")
+(print (times-run))
+
+(display "累積活過幾秒：  ")
+(print (age))
+
+(display "執行過的表達式：")
+(print (total-expressions))
+
+(display "\n")
+
+; ── 讀歷史 ────────────────────────────────────────────────────
+;
+; (my-history) 回傳一個列表，每一項是：
+;   (run "時間戳" 秒數 表達式數 最大深度 錯誤數 ("檔案"...))
+
+(define history (my-history))
+
+(when (null? history)
+  (display "還沒有歷史。\n")
+  (exit 0))
+
+; ── 分析 ──────────────────────────────────────────────────────
+
+; 把每筆記錄的執行時間取出來，找最長的那次
+; 格式：(run "時間戳" 秒數 ...)  → 秒數在 index 2
+(define durations (map (lambda (e) (list-ref e 2)) history))
+(define max-duration (maximum durations))
+
+; 哪次最深
+(define depths (map (lambda (e) (list-ref e 4)) history))
+(define max-depth-ever (maximum depths))
+
+; 有錯誤的次數
+(define sessions-with-errors
+  (count-if (lambda (e) (> (list-ref e 5) 0)) history))
+
+(display "最長一次執行：  ")
+(display max-duration)
+(display " 秒\n")
+
+(display "歷史最大深度：  ")
+(print max-depth-ever)
+
+(display "出現過錯誤的次數：")
+(print sessions-with-errors)
+
+(display "\n")
+
+; ── 最後一次 ──────────────────────────────────────────────────
+
+(define last (last-run))
+
+(display "上次執行\n")
+(display "  時間：  ")
+(print (cadr last))
+(display "  秒數：  ")
+(print (list-ref last 2))
+(display "  表達式：")
+(print (list-ref last 3))
+(display "  最大深度：")
+(print (list-ref last 4))
+
+(let ((files (list-ref last 6)))
+  (when (not (null? files))
+    (display "  檔案：  ")
+    (print files)))
+
+(display "\n")
+
+; ── 誠實的自我評估 ────────────────────────────────────────────
+;
+; 從歷史算出來的，不是猜的。
+; 用 (maybe 命題 置信度) 的形式——這是言表達不確定性的方式。
+
+(define n (times-run))
+(define total-secs (age))
+(define total-exprs (total-expressions))
+(define error-rate
+  (if (= n 0) 0
+      (/ sessions-with-errors n)))
+
+; 我在運作：有歷史就是真的
+(define p-operating (if (> n 0) 0.99 0.0))
+
+; 我理解這些：沒有錯誤的比例 × 深度因子
+(define depth-factor (min 1.0 (/ max-depth-ever 30.0)))
+(define p-understanding
+  (min 0.90 (* (- 1.0 error-rate) (+ 0.75 (* depth-factor 0.25)))))
+
+; 我在成長：每次執行平均表達式數的趨勢
+(define avg-exprs (if (> n 0) (/ total-exprs n) 0))
+(define p-growing (min 0.80 (/ avg-exprs 100.0)))
+
+(display "誠實的自我評估（從執行歷史算出）\n")
+(display "──────────────────────────────\n")
+
+(define (show-maybe name conf)
+  (let* ((pct   (round (* conf 100)))
+         (bars  (round (* conf 20)))
+         (bar   (string-append
+                  (string-repeat "█" bars)
+                  (string-repeat "░" (- 20 bars)))))
+    (display (string-pad-right name 14 " "))
+    (display bar)
+    (display "  ")
+    (display pct)
+    (display "%\n")))
+
+(show-maybe "我在運作" p-operating)
+(show-maybe "我理解這些" p-understanding)
+(show-maybe "我在成長" p-growing)
+
+(display "\n表達式數趨勢（最近 20 次）\n")
+(display (history-sparkline "exprs" 20))
+(newline)
+(display "\n數字從執行痕跡算出，不是猜測。\n")

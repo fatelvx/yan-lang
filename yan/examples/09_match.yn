@@ -1,0 +1,83 @@
+; 09_match.yn — 模式匹配
+;
+; match 讓你直接用形狀來描述邏輯，
+; 不用一層一層 if/car/cdr 拆。
+
+; ── 基本用法 ──────────────────────────────────────────────────
+
+(define (describe x)
+  (match x
+    (0        "零")
+    (1        "一")
+    ('hello   "打招呼")
+    (()       "空的")
+    ((a . _)  (string-append "以 " (number->string a) " 開頭的列表"))
+    (_        "其他")))
+
+(display (describe 0))      (newline)
+(display (describe 1))      (newline)
+(display (describe 'hello)) (newline)
+(display (describe '()))    (newline)
+(display (describe '(7 8))) (newline)
+(display (describe "xyz"))  (newline)
+
+; ── 列表操作 ────────────────────────────────────────────────────
+
+(define (len lst)
+  (match lst
+    (() 0)
+    ((_ . rest) (+ 1 (len rest)))))
+
+(define (my-map f lst)
+  (match lst
+    (() '())
+    ((x . xs) (cons (f x) (my-map f xs)))))
+
+(define (my-filter pred lst)
+  (match lst
+    (() '())
+    ((x . xs)
+     (if (pred x)
+         (cons x (my-filter pred xs))
+         (my-filter pred xs)))))
+
+(display (len '(a b c d e)))                     (newline)
+(display (my-map (lambda (x) (* x x)) '(1 2 3 4 5))) (newline)
+(display (my-filter odd? '(1 2 3 4 5 6 7)))      (newline)
+
+; ── 巢狀模式 ────────────────────────────────────────────────────
+; 模式可以任意巢狀，辨認深層結構
+
+(define (tree-sum tree)
+  (match tree
+    (('leaf x)      x)
+    (('node l r)    (+ (tree-sum l) (tree-sum r)))))
+
+(define my-tree
+  '(node
+      (node (leaf 1) (leaf 2))
+      (node (leaf 3) (leaf 4))))
+
+(display (tree-sum my-tree))  (newline)   ; 10
+
+; ── 自然數遞迴 ──────────────────────────────────────────────────
+
+(define (fib n)
+  (match n
+    (0 0)
+    (1 1)
+    (n (+ (fib (- n 1)) (fib (- n 2))))))
+
+(display (fib 10))  (newline)   ; 55
+
+; ── 帶累加器的 flatten ──────────────────────────────────────────
+
+(define (flatten lst)
+  (match lst
+    (()         '())
+    (((x . xs) . rest)
+     (append (flatten (cons x xs)) (flatten rest)))
+    ((x . rest)
+     (cons x (flatten rest)))))
+
+(display (flatten '(1 (2 (3 4) 5) (6 7))))  (newline)

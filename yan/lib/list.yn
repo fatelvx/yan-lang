@@ -1,0 +1,146 @@
+; yan/lib/list.yn — 列表工具庫
+;
+; 用法：(load "yan/lib/list.yn")
+;
+; 這個庫完全用言寫成，沒有任何 Python 擴展。
+; 工具透明，行為可讀。
+
+; ── 基本查詢 ──────────────────────────────────────────────────
+
+(define (last lst)
+  (if (null? (cdr lst))
+      (car lst)
+      (last (cdr lst))))
+
+(define (init lst)
+  (if (null? (cdr lst))
+      '()
+      (cons (car lst) (init (cdr lst)))))
+
+(define (nth lst n)
+  (if (= n 0)
+      (car lst)
+      (nth (cdr lst) (- n 1))))
+
+; ── 切片 ──────────────────────────────────────────────────────
+
+(define (take lst n)
+  (if (or (= n 0) (null? lst))
+      '()
+      (cons (car lst) (take (cdr lst) (- n 1)))))
+
+(define (drop lst n)
+  (if (or (= n 0) (null? lst))
+      lst
+      (drop (cdr lst) (- n 1))))
+
+(define (take-while pred lst)
+  (if (or (null? lst) (not (pred (car lst))))
+      '()
+      (cons (car lst) (take-while pred (cdr lst)))))
+
+(define (drop-while pred lst)
+  (if (or (null? lst) (not (pred (car lst))))
+      lst
+      (drop-while pred (cdr lst))))
+
+; ── 測試 ──────────────────────────────────────────────────────
+
+(define (any? pred lst)
+  (cond
+    ((null? lst) #f)
+    ((pred (car lst)) #t)
+    (else (any? pred (cdr lst)))))
+
+(define (all? pred lst)
+  (cond
+    ((null? lst) #t)
+    ((not (pred (car lst))) #f)
+    (else (all? pred (cdr lst)))))
+
+(define (none? pred lst)
+  (not (any? pred lst)))
+
+(define (count pred lst)
+  (length (filter pred lst)))
+
+; ── 化簡 ──────────────────────────────────────────────────────
+
+(define (fold-left f init lst)
+  (if (null? lst)
+      init
+      (fold-left f (f init (car lst)) (cdr lst))))
+
+(define (fold-right f init lst)
+  (if (null? lst)
+      init
+      (f (car lst) (fold-right f init (cdr lst)))))
+
+(define (sum lst)     (fold-left + 0 lst))
+(define (product lst) (fold-left * 1 lst))
+
+(define (flatten lst)
+  (cond
+    ((null? lst) '())
+    ((pair? (car lst)) (append (flatten (car lst)) (flatten (cdr lst))))
+    (else (cons (car lst) (flatten (cdr lst))))))
+
+; ── 組合 ──────────────────────────────────────────────────────
+
+(define (zip lst1 lst2)
+  (if (or (null? lst1) (null? lst2))
+      '()
+      (cons (list (car lst1) (car lst2))
+            (zip (cdr lst1) (cdr lst2)))))
+
+(define (zip-with f lst1 lst2)
+  (if (or (null? lst1) (null? lst2))
+      '()
+      (cons (f (car lst1) (car lst2))
+            (zip-with f (cdr lst1) (cdr lst2)))))
+
+(define (partition pred lst)
+  (let loop ((xs lst) (yes '()) (no '()))
+    (cond
+      ((null? xs) (list (reverse yes) (reverse no)))
+      ((pred (car xs)) (loop (cdr xs) (cons (car xs) yes) no))
+      (else (loop (cdr xs) yes (cons (car xs) no))))))
+
+; ── 數列 ──────────────────────────────────────────────────────
+
+(define (range start end)
+  (if (>= start end)
+      '()
+      (cons start (range (+ start 1) end))))
+
+(define (iota n)
+  (range 0 n))
+
+; ── 關聯列表 ──────────────────────────────────────────────────
+
+(define (assoc-get key alist default)
+  (let ((pair (assoc key alist)))
+    (if pair (cadr pair) default)))
+
+(define (alist-set key val alist)
+  (cons (list key val)
+        (filter (lambda (pair) (not (equal? (car pair) key)))
+                alist)))
+
+; ── 排列 ──────────────────────────────────────────────────────
+
+(define (unique lst)
+  (fold-right
+    (lambda (x acc)
+      (if (member x acc) acc (cons x acc)))
+    '()
+    lst))
+
+(define (group-by f lst)
+  (fold-left
+    (lambda (acc x)
+      (let* ((k   (f x))
+             (cur (assoc-get k acc '())))
+        (alist-set k (append cur (list x)) acc)))
+    '()
+    lst))

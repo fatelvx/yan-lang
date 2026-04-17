@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>這段對話的旋律</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: #07070f;
+  color: #bbc;
+  font-family: 'Courier New', monospace;
+  padding: 50px 60px;
+  min-height: 100vh;
+}
+h1 {
+  font-size: 13px;
+  color: #334;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.subtitle {
+  font-size: 11px;
+  color: #223;
+  margin-bottom: 50px;
+  letter-spacing: 1px;
+}
+
+/* ── 時間軸 ── */
+.timeline {
+  position: relative;
+  margin-bottom: 50px;
+}
+.tl-line {
+  position: absolute;
+  left: 24px;
+  top: 0; bottom: 0;
+  width: 1px;
+  background: #151525;
+}
+.tl-item {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 10px 0 10px 56px;
+  position: relative;
+  transition: all 0.15s;
+  border-radius: 6px;
+  margin: 2px 0;
+}
+.tl-item.active {
+  background: #0d0d1e;
+}
+.tl-dot {
+  position: absolute;
+  left: 18px;
+  width: 13px; height: 13px;
+  border-radius: 50%;
+  border: 1px solid currentColor;
+  background: #07070f;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+.tl-item.active .tl-dot {
+  background: currentColor;
+  box-shadow: 0 0 12px currentColor;
+  transform: scale(1.3);
+}
+.tl-item.done .tl-dot {
+  background: currentColor;
+  opacity: 0.4;
+}
+.tl-name {
+  font-size: 13px;
+  font-weight: bold;
+  min-width: 160px;
+  transition: color 0.2s;
+}
+.tl-note {
+  font-size: 10px;
+  min-width: 45px;
+  opacity: 0.5;
+}
+.tl-desc {
+  font-size: 11px;
+  color: #334;
+  transition: color 0.2s;
+}
+.tl-item.active .tl-desc {
+  color: #667;
+}
+
+/* ── 大音符顯示 ── */
+.big-note {
+  text-align: center;
+  margin-bottom: 40px;
+}
+.big-note-name {
+  font-size: 11px;
+  color: #334;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+  transition: color 0.3s;
+}
+.big-pitch {
+  font-size: 64px;
+  font-weight: bold;
+  color: #1a1a2e;
+  transition: color 0.3s, text-shadow 0.3s;
+  letter-spacing: -1px;
+}
+.big-desc {
+  font-size: 12px;
+  color: #223;
+  margin-top: 8px;
+  transition: color 0.3s;
+  min-height: 20px;
+}
+
+/* ── 控制 ── */
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 40px;
+}
+button {
+  background: #0e0e1e;
+  color: #667;
+  border: 1px solid #1a1a2e;
+  padding: 9px 22px;
+  cursor: pointer;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 12px;
+  letter-spacing: 2px;
+  transition: all 0.15s;
+}
+button:hover { background: #151530; color: #99b; }
+button.playing { color: #6cf; border-color: #369; background: #0a1525; }
+
+label { font-size: 11px; color: #334; }
+input[type=range] { width: 110px; accent-color: #446; }
+.spd-v { font-size: 11px; color: #445; }
+
+/* ── 進度條 ── */
+.progress-bar {
+  height: 2px;
+  background: #111120;
+  border-radius: 1px;
+  margin-bottom: 40px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  width: 0%;
+  background: #334;
+  transition: width 0.1s linear, background 0.3s;
+  border-radius: 1px;
+}
+</style>
+</head>
+<body>
+
+<h1>這段對話的旋律</h1>
+<div class="subtitle">從「隨便寫一個程式」到現在 · 每一個造出來的東西是一個音</div>
+
+<div class="big-note">
+  <div class="big-note-name" id="cur-name">—</div>
+  <div class="big-pitch" id="cur-pitch">—</div>
+  <div class="big-desc" id="cur-desc"></div>
+</div>
+
+<div class="progress-bar">
+  <div class="progress-fill" id="prog"></div>
+</div>
+
+<div class="controls">
+  <button id="main-btn" onclick="togglePlay()">▶ 播放</button>
+  <label>速度</label>
+  <input type="range" id="spd" min="300" max="2000" value="800"
+         oninput="document.getElementById('spd-v').textContent=this.value+'ms'">
+  <span class="spd-v" id="spd-v">800ms</span>
+</div>
+
+<div class="timeline" id="timeline">
+  <div class="tl-line"></div>
+</div>
+
+<script>
+const NOTES = [{"name": "nonsense", "desc": "\u7b2c\u4e00\u500b\u7a0b\u5f0f\uff0c\u6c92\u6709\u76ee\u7684\u7684\u6a5f\u5668", "midi": 67, "freq": 391.995, "color": "#d0e544", "note": "G4"}, {"name": "yan", "desc": "\u8a00\uff1a\u4e00\u500b Lisp \u76f4\u8b6f\u5668", "midi": 57, "freq": 220.0, "color": "#e544a5", "note": "A3"}, {"name": "lsystem", "desc": "L-system \u690d\u7269", "midi": 76, "freq": 659.255, "color": "#8fe544", "note": "E5"}, {"name": "parametric", "desc": "\u77e5\u9053\u81ea\u5df1\u72c0\u614b\u7684\u690d\u7269", "midi": 62, "freq": 293.665, "color": "#449fe5", "note": "D4"}, {"name": "grow_live", "desc": "\u5728\u7d42\u7aef\u6a5f\u88e1\u6d3b\u8457\u7684\u690d\u7269", "midi": 57, "freq": 220.0, "color": "#a5e544", "note": "A3"}, {"name": "ast_art", "desc": "\u7a0b\u5f0f\u78bc\u7684\u5e7e\u4f55\u5f62\u72c0", "midi": 64, "freq": 329.628, "color": "#44e557", "note": "E4"}, {"name": "trace_heat", "desc": "\u57f7\u884c\u7684\u71b1\u5ea6", "midi": 74, "freq": 587.33, "color": "#44c8e5", "note": "D5"}, {"name": "05_meta", "desc": "\u8a9e\u8a00\u7406\u89e3\u81ea\u5df1", "midi": 60, "freq": 261.626, "color": "#5244e5", "note": "C4"}, {"name": "06_quine", "desc": "\u8cc7\u6599\u7b49\u65bc\u81ea\u5df1", "midi": 91, "freq": 1567.982, "color": "#44b5e5", "note": "G6"}, {"name": "07_quine_gen", "desc": "\u7a0b\u5f0f\u958b\u59cb\u8001\u5316", "midi": 72, "freq": 523.251, "color": "#e544ca", "note": "C5"}, {"name": "roll", "desc": "\u8a08\u7b97\u8b8a\u6210\u6a02\u8b5c", "midi": 50, "freq": 146.832, "color": "#e57d44", "note": "D3"}, {"name": "quine_voice", "desc": "quine \u5531\u81ea\u5df1\u7684\u8072\u97f3", "midi": 67, "freq": 391.995, "color": "#44e58f", "note": "G4"}, {"name": "evolve_voice", "desc": "\u8001\u5316\u7684\u97f3\u5728\u6f02\u79fb", "midi": 57, "freq": 220.0, "color": "#e5446f", "note": "A3"}];
+
+// ── 建立時間軸 UI ────────────────────────────────────────────────
+const tl = document.getElementById('timeline');
+NOTES.forEach((n, i) => {
+  const div = document.createElement('div');
+  div.className = 'tl-item';
+  div.id = `tl-${i}`;
+  div.style.color = n.color;
+  div.innerHTML = `
+    <div class="tl-dot" style="color:${n.color}"></div>
+    <div class="tl-name" style="color:${n.color}88">${n.name}</div>
+    <div class="tl-note">${n.note}</div>
+    <div class="tl-desc">${n.desc}</div>`;
+  tl.appendChild(div);
+});
+
+// ── 音訊 ────────────────────────────────────────────────────────
+let ac = null;
+function getAC() {
+  if (!ac) ac = new (window.AudioContext || window.webkitAudioContext)();
+  return ac;
+}
+
+function playNote(freq, when, dur, gain=0.32) {
+  const ctx = getAC();
+  const osc = ctx.createOscillator();
+  const g   = ctx.createGain();
+  osc.type = 'triangle';
+  osc.frequency.value = freq;
+  g.gain.setValueAtTime(0, when);
+  g.gain.linearRampToValueAtTime(gain, when + 0.02);
+  g.gain.setValueAtTime(gain, when + dur * 0.75);
+  g.gain.linearRampToValueAtTime(0.0001, when + dur);
+  osc.connect(g); g.connect(ctx.destination);
+  osc.start(when); osc.stop(when + dur + 0.03);
+}
+
+// ── 播放狀態 ────────────────────────────────────────────────────
+let playing = false;
+let raf = null;
+let wallStart = 0;
+let totalMs = 0;
+
+function togglePlay() {
+  if (playing) { stopPlay(); } else { startPlay(); }
+}
+
+async function startPlay() {
+  const ctx = getAC();
+  if (ctx.state === 'suspended') await ctx.resume();
+
+  const ms  = parseInt(document.getElementById('spd').value);
+  const sec = ms / 1000;
+  const now = ctx.currentTime + 0.15;
+
+  NOTES.forEach((n, i) => {
+    playNote(n.freq, now + i * sec, sec * 1.3);
+  });
+
+  totalMs   = NOTES.length * ms;
+  wallStart = performance.now() - 100;
+  playing   = true;
+
+  document.getElementById('main-btn').textContent = '■ 停止';
+  document.getElementById('main-btn').classList.add('playing');
+
+  function animate() {
+    if (!playing) return;
+    const elapsed = performance.now() - wallStart;
+    const idx     = Math.min(Math.floor(elapsed / ms), NOTES.length - 1);
+    const prog    = Math.min(elapsed / totalMs, 1);
+
+    // 進度條
+    const pf = document.getElementById('prog');
+    pf.style.width  = (prog * 100) + '%';
+    pf.style.background = NOTES[idx].color;
+
+    // 大音符顯示
+    const n = NOTES[idx];
+    document.getElementById('cur-name').textContent  = n.name;
+    document.getElementById('cur-name').style.color  = n.color;
+    document.getElementById('cur-pitch').textContent = n.note;
+    document.getElementById('cur-pitch').style.color = n.color + '99';
+    document.getElementById('cur-pitch').style.textShadow = `0 0 30px ${n.color}66`;
+    document.getElementById('cur-desc').textContent  = n.desc;
+    document.getElementById('cur-desc').style.color  = n.color + '66';
+
+    // 時間軸
+    NOTES.forEach((_, j) => {
+      const el = document.getElementById(`tl-${j}`);
+      if (j < idx)       el.className = 'tl-item done';
+      else if (j === idx) el.className = 'tl-item active';
+      else               el.className = 'tl-item';
+    });
+
+    if (prog < 1) {
+      raf = requestAnimationFrame(animate);
+    } else {
+      stopPlay();
+    }
+  }
+
+  raf = requestAnimationFrame(animate);
+}
+
+function stopPlay() {
+  playing = false;
+  if (raf) cancelAnimationFrame(raf);
+  document.getElementById('main-btn').textContent = '▶ 播放';
+  document.getElementById('main-btn').classList.remove('playing');
+  document.getElementById('cur-name').textContent  = '—';
+  document.getElementById('cur-name').style.color  = '#334';
+  document.getElementById('cur-pitch').textContent = '—';
+  document.getElementById('cur-pitch').style.color = '#1a1a2e';
+  document.getElementById('cur-pitch').style.textShadow = 'none';
+  document.getElementById('cur-desc').textContent  = '';
+  document.getElementById('prog').style.width      = '0%';
+  NOTES.forEach((_, j) => {
+    document.getElementById(`tl-${j}`).className = 'tl-item';
+  });
+}
+</script>
+</body>
+</html>

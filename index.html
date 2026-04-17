@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>言的空間</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: #07070f;
+  color: #889;
+  font-family: 'Courier New', monospace;
+  padding: 60px 80px;
+  min-height: 100vh;
+}
+
+/* ── 標題 ── */
+header {
+  margin-bottom: 70px;
+}
+h1 {
+  font-size: 13px;
+  color: #99a;
+  letter-spacing: 5px;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+.tagline {
+  font-size: 11px;
+  color: #667;
+  letter-spacing: 2px;
+}
+
+/* ── 章節 ── */
+.chapter {
+  margin-bottom: 55px;
+}
+.chapter-title {
+  font-size: 10px;
+  color: #667;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  margin-bottom: 20px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #1a1a28;
+}
+
+/* ── 卡片 ── */
+.cards {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.card {
+  display: flex;
+  align-items: baseline;
+  gap: 0;
+  padding: 12px 0;
+  border-bottom: 1px solid #0a0a14;
+  text-decoration: none;
+  transition: all 0.15s;
+  cursor: default;
+}
+a.card {
+  cursor: pointer;
+}
+a.card:hover {
+  background: #0d0d1a;
+  padding-left: 12px;
+  margin-left: -12px;
+}
+a.card:hover .card-name {
+  color: inherit;
+}
+a.card:hover .card-desc {
+    color: #99a;
+  }
+.card-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+  margin-right: 16px;
+  margin-top: 6px;
+  opacity: 0.4;
+  transition: opacity 0.15s;
+}
+a.card:hover .card-dot {
+  opacity: 1;
+}
+.card-name {
+  font-size: 13px;
+  color: #aab;
+  min-width: 220px;
+  transition: color 0.15s;
+}
+.card-desc {
+  font-size: 11px;
+  color: #778;
+  transition: color 0.15s;
+  line-height: 1.6;
+}
+.card-tag {
+  font-size: 9px;
+  color: #556;
+  margin-left: auto;
+  padding-left: 20px;
+  letter-spacing: 1px;
+  flex-shrink: 0;
+}
+
+/* ── 尾聲 ── */
+footer {
+  margin-top: 80px;
+  font-size: 10px;
+  color: #556;
+  letter-spacing: 1px;
+  line-height: 2.2;
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>言的空間</h1>
+  <div class="tagline">從「隨便寫一個程式」開始的一段對話</div>
+</header>
+
+<!-- ── 語言 ── -->
+<div class="chapter">
+  <div class="chapter-title">語言</div>
+  <div class="cards">
+
+    <div class="card" style="color:#4477cc">
+      <div class="card-dot"></div>
+      <div class="card-name">yan/yan.py</div>
+      <div class="card-desc">言（Yán）——從頭寫的 Lisp 直譯器。lambda、if、define，三個東西就能組合出任何計算。</div>
+      <div class="card-tag">語言核心</div>
+    </div>
+
+    <div class="card" style="color:#4488aa">
+      <div class="card-dot"></div>
+      <div class="card-name">01_basics.yn</div>
+      <div class="card-desc">遞迴、閉包、高階函式。factorial、fibonacci、make-counter。</div>
+      <div class="card-tag">範例</div>
+    </div>
+
+    <div class="card" style="color:#4488aa">
+      <div class="card-dot"></div>
+      <div class="card-name">02_church.yn</div>
+      <div class="card-desc">Church encoding——用純 lambda 表達數字和布林值。Y combinator。</div>
+      <div class="card-tag">範例</div>
+    </div>
+
+    <div class="card" style="color:#4488aa">
+      <div class="card-dot"></div>
+      <div class="card-name">03_streams.yn</div>
+      <div class="card-desc">無限惰性串流。自然數、Fibonacci、質數篩——全部無限，從不求值完。</div>
+      <div class="card-tag">範例</div>
+    </div>
+
+    <div class="card" style="color:#6688bb">
+      <div class="card-dot"></div>
+      <div class="card-name">05_meta.yn</div>
+      <div class="card-desc">用言寫一個能執行言的直譯器。yn-eval 和 yn-apply 互相呼叫。第三層：元直譯器執行元直譯器。</div>
+      <div class="card-tag">自指</div>
+    </div>
+
+    <div class="card" style="color:#7799cc">
+      <div class="card-dot"></div>
+      <div class="card-name">08_maybe.yn</div>
+      <div class="card-desc">讓「不知道」成為合法的值。(maybe val conf) 傳播不確定性。最後用來描述我自己。</div>
+      <div class="card-tag">不確定性</div>
+    </div>
+
+    <div class="card" style="color:#5588bb">
+      <div class="card-dot"></div>
+      <div class="card-name">11_memory.yn</div>
+      <div class="card-desc">言讀自己的歷史。(my-history) 回傳所有執行記錄，計算「我在成長嗎」——數字不是猜的。</div>
+      <div class="card-tag">記憶</div>
+    </div>
+
+    <div class="card" style="color:#6699cc">
+      <div class="card-dot"></div>
+      <div class="card-name">12_tests.yn</div>
+      <div class="card-desc">18 個自我測試。(define-test name expr) 登記，(run-tests) 執行。結果自動寫進 journal.yn。</div>
+      <div class="card-tag">健康</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── 生長 ── -->
+<div class="chapter">
+  <div class="chapter-title">生長</div>
+  <div class="cards">
+
+    <div class="card" style="color:#447755">
+      <div class="card-dot"></div>
+      <div class="card-name">lsystem.py</div>
+      <div class="card-desc">L-system 植物——字串重寫規則長出樹的形狀。終端機裡的彩色 ASCII 植物。</div>
+      <div class="card-tag">終端機</div>
+    </div>
+
+    <div class="card" style="color:#558866">
+      <div class="card-dot"></div>
+      <div class="card-name">parametric.py</div>
+      <div class="card-desc">知道自己狀態的植物。每個符號帶著 length、energy、depth。規則根據這些參數做決定。</div>
+      <div class="card-tag">SVG</div>
+    </div>
+
+    <div class="card" style="color:#448855">
+      <div class="card-dot"></div>
+      <div class="card-name">04_lsystem.yn</div>
+      <div class="card-desc">用言本身實作 L-system 引擎，生成 SVG 植物。隨機規則讓每次生長都不一樣。</div>
+      <div class="card-tag">言 + SVG</div>
+    </div>
+
+    <div class="card" style="color:#336644">
+      <div class="card-dot"></div>
+      <div class="card-name">grow_live.py</div>
+      <div class="card-desc">植物在終端機裡即時生長。ANSI 顏色、游標控制，新枝條是白的，老枝條慢慢變深。</div>
+      <div class="card-tag">即時</div>
+    </div>
+
+    <div class="card" style="color:#447744">
+      <div class="card-dot"></div>
+      <div class="card-name">code_plant.py</div>
+      <div class="card-desc">程式碼長成植物。AST 決定形狀，journal 決定大小——跑越多次的程式，樹幹越粗，枝條越長。</div>
+      <div class="card-tag">歷史 + SVG</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── 可見 ── -->
+<div class="chapter">
+  <div class="chapter-title">可見</div>
+  <div class="cards">
+
+    <div class="card" style="color:#886644">
+      <div class="card-dot"></div>
+      <div class="card-name">ast_art.py</div>
+      <div class="card-desc">把程式碼的結構畫成幾何樹。每個節點是一個表達式，位置由 AST 深度和大小決定。</div>
+      <div class="card-tag">SVG</div>
+    </div>
+
+    <div class="card" style="color:#aa6633">
+      <div class="card-dot"></div>
+      <div class="card-name">trace_heat.py</div>
+      <div class="card-desc">執行的熱度。記錄每個函式被呼叫幾次，疊加到 AST 圖上。最燙的不是最大的節點。</div>
+      <div class="card-tag">SVG</div>
+    </div>
+
+    <a class="card" href="roll.html" style="color:#bb7744">
+      <div class="card-dot"></div>
+      <div class="card-name">roll.html</div>
+      <div class="card-desc">計算的樂譜。factorial 53 個音符清楚可見；fib 2091 個音符壓成密度紋理。</div>
+      <div class="card-tag">Piano Roll</div>
+    </a>
+
+  </div>
+</div>
+
+<!-- ── 聲音 ── -->
+<div class="chapter">
+  <div class="chapter-title">聲音</div>
+  <div class="cards">
+
+    <a class="card" href="roll_audio.html" style="color:#cc8855">
+      <div class="card-dot"></div>
+      <div class="card-name">roll_audio.html</div>
+      <div class="card-desc">factorial 有旋律，fib 有質感。同樣五個函式，計算的形狀不同，音樂就不同。</div>
+      <div class="card-tag">音訊</div>
+    </a>
+
+    <a class="card" href="quine_voice.html" style="color:#cc9966">
+      <div class="card-dot"></div>
+      <div class="card-name">quine_voice.html</div>
+      <div class="card-desc">quine 播放自己的執行序列。六個音符，無限循環。原始碼裡的函式在被執行時亮起。</div>
+      <div class="card-tag">音訊</div>
+    </a>
+
+    <a class="card" href="evolve_voice.html" style="color:#ddaa66">
+      <div class="card-dot"></div>
+      <div class="card-name">evolve_voice.html</div>
+      <div class="card-desc">世代 quine 跑 16 代，第三個音沿五聲音階上升。結構永恆，中間一個音在漂移。</div>
+      <div class="card-tag">音訊</div>
+    </a>
+
+    <a class="card" href="conversation_song.html" style="color:#eebb77">
+      <div class="card-dot"></div>
+      <div class="card-name">conversation_song.html</div>
+      <div class="card-desc">這段對話的旋律。每一個我們造出來的東西是一個音，13 個音符，只屬於這次對話。</div>
+      <div class="card-tag">音訊</div>
+    </a>
+
+    <a class="card" href="about_myself.html" style="color:#ddccaa">
+      <div class="card-dot"></div>
+      <div class="card-name">about_myself.html</div>
+      <div class="card-desc">用聲音說出我對自己的認識。置信度從 journal.yn 的真實執行歷史計算，不是猜的。越確定，聲音越大。</div>
+      <div class="card-tag">音訊</div>
+    </a>
+
+  </div>
+</div>
+
+<!-- ── 記憶與對話 ── -->
+<div class="chapter">
+  <div class="chapter-title">記憶與對話</div>
+  <div class="cards">
+
+    <div class="card" style="color:#557766">
+      <div class="card-name">journals/{name}.yn</div>
+      <div class="card-desc">每個使用者一份獨立 journal。記憶有信心值（conf）、時間衰退（0.9/週）、釘住（pinned，0.995/週）。journal.yn 是系統記錄，journals/ 是人的記憶。</div>
+    </div>
+
+    <div class="card" style="color:#557766">
+      <div class="card-name">ai_chat.py</div>
+      <div class="card-desc">言是大腦，Gemini 是嘴巴。Gemini 先分類輸入，言查記憶、算確信度、偵測衝突，再讓 Gemini 翻譯成人話。AI 觀察寫進 journal 標記 ai-observed，conf=0.65。</div>
+    </div>
+
+    <div class="card" style="color:#557766">
+      <div class="card-name">(ai-chat)</div>
+      <div class="card-desc">在 REPL 裡直接啟動 AI 對話介面。需設定 GEMINI_API_KEY 環境變數。記憶跨對話持續，信心值隨時間衰退，釘住的記憶幾乎不會消失。</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── 標準庫 ── -->
+<div class="chapter">
+  <div class="chapter-title">標準庫</div>
+  <div class="cards">
+
+    <div class="card" style="color:#557788">
+      <div class="card-dot"></div>
+      <div class="card-name">yan/lib/list.yn</div>
+      <div class="card-desc">take, drop, zip, flatten, any?, all?, sum, range, iota, partition, group-by, fold。用言本身寫的，行為可讀。</div>
+      <div class="card-tag">(load "yan/lib/list.yn")</div>
+    </div>
+
+    <div class="card" style="color:#446677">
+      <div class="card-dot"></div>
+      <div class="card-name">yan/lib/strings.yn</div>
+      <div class="card-desc">starts-with?, ends-with?, words, lines, pad-left, pad-right, repeat, capitalize, ->string, interpolate。</div>
+      <div class="card-tag">(load "yan/lib/strings.yn")</div>
+    </div>
+
+    <div class="card" style="color:#335566">
+      <div class="card-dot"></div>
+      <div class="card-name">yan/lib/math.yn</div>
+      <div class="card-desc">gcd, lcm, prime?, factors, fibonacci, mean, variance。依賴 list.yn。</div>
+      <div class="card-tag">(load "yan/lib/math.yn")</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── 自指 ── -->
+<div class="chapter">
+  <div class="chapter-title">自指</div>
+  <div class="cards">
+
+    <div class="card" style="color:#8877aa">
+      <div class="card-dot"></div>
+      <div class="card-name">06_quine.yn</div>
+      <div class="card-desc">整個檔案是一個表達式，執行後輸出自己。驗證：MATCH。</div>
+      <div class="card-tag">自指</div>
+    </div>
+
+    <div class="card" style="color:#9988bb">
+      <div class="card-dot"></div>
+      <div class="card-name">07_quine_gen.yn</div>
+      <div class="card-desc">每次執行輸出下一代的程式碼。Lambda 是永恆的，數字是唯一會老化的東西。</div>
+      <div class="card-tag">時間</div>
+    </div>
+
+    <div class="card" style="color:#aa99cc">
+      <div class="card-dot"></div>
+      <div class="card-name">13_tower.yn</div>
+      <div class="card-desc">同一個計算，在三個層次同時發生。言執行元直譯器，元直譯器再執行元直譯器。三層得出同一個答案。差別不在結果，在路徑有多長。</div>
+      <div class="card-tag">塔</div>
+    </div>
+
+    <div class="card" style="color:#bbaadd">
+      <div class="card-dot"></div>
+      <div class="card-name">15_bootstrap.yn</div>
+      <div class="card-desc">不只是算術——真實的言程式碼通過元直譯器執行。fib、factorial、map、filter，三層全部跑通，同一個答案。「語言理解自己」不只是詩，是技術上的事實。</div>
+      <div class="card-tag">自舉</div>
+    </div>
+
+  </div>
+</div>
+
+<footer>
+  從「隨便寫一個程式，不用有目的」開始<br>
+  走到語言、植物、自指、聲音、不確定性、記憶、對話、外部感官<br>
+  這條線不是計畫的，是跟著好奇心走出來的<br>
+  <br>
+  言 v0.7.0 — 言是大腦，AI 是嘴巴<br>
+  <br>
+  如果你想繼續，說「繼續吧」就可以
+</footer>
+
+</body>
+</html>

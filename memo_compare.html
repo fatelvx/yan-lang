@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>有記憶 vs 沒有記憶</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: #04040d;
+  font-family: 'Courier New', monospace;
+  color: #556;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 34px 20px;
+}
+h1 {
+  font-size: 11px;
+  color: #334;
+  letter-spacing: 5px;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.sub {
+  font-size: 9px;
+  color: #1c1c2c;
+  margin-bottom: 22px;
+  letter-spacing: 1px;
+}
+.stage {
+  display: flex;
+  gap: 0;
+  width: 1240px;
+}
+.side {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.side-label {
+  font-size: 9px;
+  letter-spacing: 3px;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.side-label.naive { color: #445; }
+.side-label.memo  { color: #2e4a3e; }
+.node-count {
+  font-size: 18px;
+  font-weight: bold;
+  transition: color 0.2s;
+}
+.count-naive { color: #223; }
+.count-memo  { color: #193028; }
+canvas { display: block; border: 1px solid #0c0c18; border-radius: 2px; }
+.divider {
+  width: 1px;
+  background: #0f0f20;
+  align-self: stretch;
+  margin: 0 4px;
+}
+.controls {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  margin: 16px 0 8px;
+}
+button {
+  background: #0c0c1c;
+  color: #556;
+  border: 1px solid #181830;
+  padding: 8px 22px;
+  cursor: pointer;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 12px;
+  letter-spacing: 1px;
+  transition: all 0.15s;
+}
+button:hover { background: #141428; color: #88a; }
+button.playing { color: #6cf; border-color: #248; }
+label { font-size: 10px; color: #2a2a3c; }
+input[type=range] { width: 80px; accent-color: #336; }
+.spd-v { font-size: 10px; color: #334; }
+.summary {
+  font-size: 10px;
+  color: #1e1e30;
+  margin-top: 10px;
+  letter-spacing: 1px;
+  transition: color 0.3s;
+  height: 14px;
+  text-align: center;
+}
+.summary.done { color: #445; }
+</style>
+</head>
+<body>
+
+<h1>有記憶的心 vs 沒有記憶的心</h1>
+<div class="sub">fib(8) · 同樣的問題，不同的形狀</div>
+
+<div class="stage">
+  <div class="side">
+    <div class="side-label naive">
+      沒有記憶
+      <span class="node-count count-naive" id="naive-count">0</span>
+      <span style="font-size:9px;color:#223">/ 67</span>
+    </div>
+    <canvas id="naive-cv" width="620" height="480"></canvas>
+  </div>
+  <div class="divider"></div>
+  <div class="side">
+    <div class="side-label memo">
+      有記憶
+      <span class="node-count count-memo" id="memo-count">0</span>
+      <span style="font-size:9px;color:#193028">/ 15</span>
+    </div>
+    <canvas id="memo-cv" width="620" height="480"></canvas>
+  </div>
+</div>
+
+<div class="controls">
+  <button id="btn" onclick="togglePlay()">▶ 播放</button>
+  <label>速度</label>
+  <input type="range" id="spd" min="20" max="400" value="70"
+         oninput="document.getElementById('spd-v').textContent=this.value+'ms'">
+  <span class="spd-v" id="spd-v">70ms</span>
+  <button onclick="doReset()">↺ 重置</button>
+</div>
+<div class="summary" id="summary"></div>
+
+<script>
+const NAIVE_N  = [{"id": 0, "n": 8, "parent": null, "children": [1, 42], "x": 20.3359375, "y": 0, "value": 21, "cached": false, "color": "#f29b18", "color_dim": "rgba(242,155,24,0.22)", "freq": 261.63}, {"id": 1, "n": 7, "parent": 0, "children": [2, 27], "x": 12.328125, "y": 1, "value": 13, "cached": false, "color": "#efe11c", "color_dim": "rgba(239,225,28,0.22)", "freq": 293.66}, {"id": 2, "n": 6, "parent": 1, "children": [3, 18], "x": 7.34375, "y": 2, "value": 8, "cached": false, "color": "#b3eb20", "color_dim": "rgba(179,235,32,0.22)", "freq": 392.0}, {"id": 3, "n": 5, "parent": 2, "children": [4, 13], "x": 4.3125, "y": 3, "value": 5, "cached": false, "color": "#70e824", "color_dim": "rgba(112,232,36,0.22)", "freq": 523.25}, {"id": 4, "n": 4, "parent": 3, "children": [5, 10], "x": 2.375, "y": 4, "value": 3, "cached": false, "color": "#31e528", "color_dim": "rgba(49,229,40,0.22)", "freq": 659.26}, {"id": 5, "n": 3, "parent": 4, "children": [6, 9], "x": 1.25, "y": 5, "value": 2, "cached": false, "color": "#2be260", "color_dim": "rgba(43,226,96,0.22)", "freq": 783.99}, {"id": 6, "n": 2, "parent": 5, "children": [7, 8], "x": 0.5, "y": 6, "value": 1, "cached": false, "color": "#2fdf9d", "color_dim": "rgba(47,223,157,0.22)", "freq": 1046.5}, {"id": 7, "n": 1, "parent": 6, "children": [], "x": 0.0, "y": 7, "value": 1, "cached": false, "color": "#32dbd5", "color_dim": "rgba(50,219,213,0.22)", "freq": 1318.51}, {"id": 8, "n": 0, "parent": 6, "children": [], "x": 1.0, "y": 7, "value": 0, "cached": false, "color": "#36a7d8", "color_dim": "rgba(54,167,216,0.22)", "freq": 1760.0}, {"id": 9, "n": 1, "parent": 5, "children": [], "x": 2.0, "y": 6, "value": 1, "cached": false, "color": "#32dbd5", "color_dim": "rgba(50,219,213,0.22)", "freq": 1318.51}, {"id": 10, "n": 2, "parent": 4, "children": [11, 12], "x": 3.5, "y": 5, "value": 1, "cached": false, "color": "#2fdf9d", "color_dim": "rgba(47,223,157,0.22)", "freq": 1046.5}, {"id": 11, "n": 1, "parent": 10, "children": [], "x": 3.0, "y": 6, "value": 1, "cached": false, "color": "#32dbd5", "color_dim": "rgba(50,219,213,0.22)", "freq": 1318.51}, {"id": 12, "n": 0, "parent": 10, "children": [], "x": 4.0, "y": 6, "value": 0, "cached": false, "color": "#36a7d8", "color_dim": "rgba(54,167,216,0.22)", "freq": 1760.0}, {"id": 13, "n": 3, "parent": 3, "children": [14, 17], "x": 6.25, "y": 4, "value": 2, "cached": false, "color": "#2be260", "color_dim": "rgba(43,226,96,0.22)", "freq": 783.99}, {"id": 14, "n": 2, "parent": 13, "children": [15, 16], "x": 5.5, "y": 5, "value": 1, "cached": false, "color": "#2fdf9d", "color_dim": "rgba(47,223,157,0.22)", "freq": 1046.5}, {"id": 15, "n": 1, "parent": 14, "children": [], "x": 5.0, "y": 6, "value": 1, "cached": false, "color": "#32dbd5", "color_dim": "rgba(50,219,213,0.22)", "freq": 1318.51}, {"id": 16, "n": 0, "parent": 14, "children": [], "x": 6.0, "y": 6, "value": 0, "cached": false, "color": "#36a7d8", "color_dim": "rgba(54,167,216,0.22)", "freq": 1760.0}, {"id": 17, "n": 1, "parent": 13, "children": [], "x": 7.0, "y": 5, "value": 1, "cached": false, "color": "#32dbd5", "color_dim": "rgba(50,219,213,0.22)", "freq": 1318.51}, {"id": 18, "n": 4, "parent": 2, "children": [19, 24], "x": 10.375, "y": 3, "value": 3, "cached": false, "color": "#31e528", "color_dim": "rgba(49,229,40,0.22)", "freq": 659.26}, {"id": 19, "n": 3, "parent": 18, "children": [20, 23], "x": 9.25, "y": 4, "value": 2, "cached": false, "color": "#2be260", "color_dim": "rgba(43,226,96,0.22)", "freq": 783.99}, {"id": 20, "n": 2, "parent": 19, "children": [21, 22], "x": 8.5, "y": 5, "value": 1, "cached": false, "color": "#2fdf9d", "color_dim": "rgba(47,223,157,0.22)", "freq": 1046.5}, {"id": 21, "n": 1, "parent": 20, "children": [], "x": 8.0, "y": 6, "value": 1, "cached": false, "color": "#32dbd5", "color_dim": "rgba(50,219,213,0.22)", "freq": 1318.51}, {"id": 22, "n": 0, "parent": 20, "children": [], "x": 9.0, "y": 6, "value": 0, "cached": false, "color": "#36a7d8", "color_dim": "rgba(54,167,216,0.22)", "freq": 1760.0}, {"id": 23, "n": 1, "parent": 19, "children": [], "x": 10.0, "y": 5, "value": 1, "cached": false, "color": "#32dbd5", "color_dim": "rgba(50,219,213,0.22)", "freq": 1318.51}, {"id": 24, "n": 2, "parent": 18, "children": [25, 26], "x": 11.5, "y": 4, "value": 1, "cached": false, "color": "#2fdf9d", "color_dim": "rgba(47,223,157,0.22)", "freq": 1046.5}, {"id": 25, "n": 1, "parent": 24, "children": [], "x": 11.0, "y": 5, "value": 1, "cached": false, "color": "#32dbd5", "color_dim": "rgba(50,219,213,0.22)", "freq": 1318.51}, {"id": 26, "n": 0, "parent": 24, "children": [], "x": 12.0, "y": 5, "value": 0, "cached": false, "color": "#36a7d8", "color_dim": "rgba(54,167,216,0.22)", "freq": 1760.0}, {"id": 27, "n": 5, "parent": 1, "children": [28, 37], "x": 17.3125, "y": 2, "value": 5, "cached": false, "color": "#70e824", "color_dim": "rgba(112,232,36,0.22)", "freq": 523.25}, {"id": 28, "n": 4, "parent": 27, "children": [29, 34], "x": 15.375, "y": 3, "value": 3, "cached": false, "color": "#31e528", "color_dim": "rgba(49,229,40,0.22)", "freq": 659.26}, {"id": 29, "n": 3, "parent": 28, "children": [30, 33], "x": 14.25, "y": 4, "value": 2, "cached": false, "color": "#2be260", "color_dim": "rgba(43,226,96,0.22)", "freq": 783.99}, {"id": 30, "n": 2, "parent": 29, "children": [31, 32], "x": 13.5, "y": 5, "value": 1, "cached": false, "color": "#2fdf9d", "color_dim": "rgba(47,223,157,0.22)", "freq": 1046.5}, {"id": 31, "n": 1, "parent": 30, "children": [], "x": 13.0, "y": 6, "value": 1, "cached": false, "color": "#32dbd5", "color_dim": "rgba(50,219,213,0.22)", "freq": 1318.51}, {"id": 32, "n": 0, "parent": 30, "children": [], "x": 14.0, "y": 6, "value": 0, "cached": false, "color": "#36a7d8", "color_dim": "rgba(54,167,216,0.22)", "freq": 1760.0}, {"id": 33, "n": 1, "parent": 29, "children": [], "x": 15.0, "y": 5, "value": 1, "cached": false, "color": "#32dbd5", "color_dim": "rgba(50,219,213,0.22)", "freq": 1318.51}, {"id": 34, "n": 2, "parent": 28, "children": [35, 36], "x": 16.5, "y": 4, "value": 1, "cached": false, "color": "#2fdf9d", "color_dim": "rgba(47,223,157,0.22)", "freq": 1046.5}, {"id": 35, "n": 1, "parent": 34, "children": [], "x": 16.0, "y": 5, "value": 1, "cached": false, "color": "#32dbd5", "color_dim": "rgba(50,219,213,0.22)", "freq": 1318.51}, {"id": 36, "n": 0, "parent": 34, "children": [], "x": 17.0, "y": 5, "value": 0, "cached": false, "color": "#36a7d8", "color_dim": "rgba(54,167,216,0.22)", "freq": 1760.0}, {"id": 37, "n": 3, "parent": 27, "children": [38, 41], "x": 19.25, "y": 3, "value": 2, "cached": false, "color": "#2be260", "color_dim": "rgba(43,226,96,0.22)", "freq": 783.99}, {"id": 38, "n": 2, "parent": 37, "children": [39, 40], "x": 18.5, "y": 4, "value": 1, "cached": false, "color": "#2fdf9d", "color_dim": "rgba(47,223,157,0.22)", "freq": 1046.5}, {"id": 39, "n": 1, "parent": 38, "children": [], "x": 18.0, "y": 5, "value": 1, "cached": false, "color": "#32dbd5", "color_dim": "rgba(50,219,213,0.22)", "freq": 1318.51}, {"id": 40, "n": 0, "parent": 38, "children": [], "x": 19.0, "y": 5, "value": 0, "cached": false, "color": "#36a7d8", "color_dim": "rgba(54,167,216,0.22)", "freq": 1760.0}, {"id": 41, "n": 1, "parent": 37, "children": [], "x": 20.0, "y": 4, "value": 1, "cached": false, "color": "#32dbd5", "color_dim": "rgba(50,219,213,0.22)", "freq": 1318.51}, {"id": 42, "n": 6, "parent": 0, "children": [43, 58], "x": 28.34375, "y": 1, "value": 8, "cached": false, "color": "#b3eb20", "color_dim": "rgba(179,235,32,0.22)", "freq": 392.0}, {"id": 43, "n": 5, "parent": 42, "children": [44, 53], "x": 25.3125, "y": 2, "value": 5, "cached": false, "color": "#70e824", "color_dim": "rgba(112,232,36,0.22)", "freq": 523.25}, {"id": 44, "n": 4, "parent": 43, "children": [45, 50], "x": 23.375, "y": 3, "value": 3, "cached": false, "color": "#31e528", "color_dim": "rgba(49,229,40,0.22)", "freq": 659.26}, {"id": 45, "n": 3, "parent": 44, "children": [46, 49], "x": 22.25, "y": 4, "value": 2, "cached": false, "color": "#2be260", "color_dim": "rgba(43,226,96,0.22)", "freq": 783.99}, {"id": 46, "n": 2, "parent": 45, "children": [47, 48], "x": 21.5, "y": 5, "value": 1, "cached": false, "color": "#2fdf9d", "color_dim": "rgba(47,223,157,0.22)", "freq": 1046.5}, {"id": 47, "n": 1, "parent": 46, "children": [], "x": 21.0, "y": 6, "value": 1, "cached": false, "color": "#32dbd5", "color_dim": "rgba(50,219,213,0.22)", "freq": 1318.51}, {"id": 48, "n": 0, "parent": 46, "children": [], "x": 22.0, "y": 6, "value": 0, "cached": false, "color": "#36a7d8", "color_dim": "rgba(54,167,216,0.22)", "freq": 1760.0}, {"id": 49, "n": 1, "parent": 45, "children": [], "x": 23.0, "y": 5, "value": 1, "cached": false, "color": "#32dbd5", "color_dim": "rgba(50,219,213,0.22)", "freq": 1318.51}, {"id": 50, "n": 2, "parent": 44, "children": [51, 52], "x": 24.5, "y": 4, "value": 1, "cached": false, "color": "#2fdf9d", "color_dim": "rgba(47,223,157,0.22)", "freq": 1046.5}, {"id": 51, "n": 1, "parent": 50, "children": [], "x": 24.0, "y": 5, "value": 1, "cached": false, "color": "#32dbd5", "color_dim": "rgba(50,219,213,0.22)", "freq": 1318.51}, {"id": 52, "n": 0, "parent": 50, "children": [], "x": 25.0, "y": 5, "value": 0, "cached": false, "color": "#36a7d8", "color_dim": "rgba(54,167,216,0.22)", "freq": 1760.0}, {"id": 53, "n": 3, "parent": 43, "children": [54, 57], "x": 27.25, "y": 3, "value": 2, "cached": false, "color": "#2be260", "color_dim": "rgba(43,226,96,0.22)", "freq": 783.99}, {"id": 54, "n": 2, "parent": 53, "children": [55, 56], "x": 26.5, "y": 4, "value": 1, "cached": false, "color": "#2fdf9d", "color_dim": "rgba(47,223,157,0.22)", "freq": 1046.5}, {"id": 55, "n": 1, "parent": 54, "children": [], "x": 26.0, "y": 5, "value": 1, "cached": false, "color": "#32dbd5", "color_dim": "rgba(50,219,213,0.22)", "freq": 1318.51}, {"id": 56, "n": 0, "parent": 54, "children": [], "x": 27.0, "y": 5, "value": 0, "cached": false, "color": "#36a7d8", "color_dim": "rgba(54,167,216,0.22)", "freq": 1760.0}, {"id": 57, "n": 1, "parent": 53, "children": [], "x": 28.0, "y": 4, "value": 1, "cached": false, "color": "#32dbd5", "color_dim": "rgba(50,219,213,0.22)", "freq": 1318.51}, {"id": 58, "n": 4, "parent": 42, "children": [59, 64], "x": 31.375, "y": 2, "value": 3, "cached": false, "color": "#31e528", "color_dim": "rgba(49,229,40,0.22)", "freq": 659.26}, {"id": 59, "n": 3, "parent": 58, "children": [60, 63], "x": 30.25, "y": 3, "value": 2, "cached": false, "color": "#2be260", "color_dim": "rgba(43,226,96,0.22)", "freq": 783.99}, {"id": 60, "n": 2, "parent": 59, "children": [61, 62], "x": 29.5, "y": 4, "value": 1, "cached": false, "color": "#2fdf9d", "color_dim": "rgba(47,223,157,0.22)", "freq": 1046.5}, {"id": 61, "n": 1, "parent": 60, "children": [], "x": 29.0, "y": 5, "value": 1, "cached": false, "color": "#32dbd5", "color_dim": "rgba(50,219,213,0.22)", "freq": 1318.51}, {"id": 62, "n": 0, "parent": 60, "children": [], "x": 30.0, "y": 5, "value": 0, "cached": false, "color": "#36a7d8", "color_dim": "rgba(54,167,216,0.22)", "freq": 1760.0}, {"id": 63, "n": 1, "parent": 59, "children": [], "x": 31.0, "y": 4, "value": 1, "cached": false, "color": "#32dbd5", "color_dim": "rgba(50,219,213,0.22)", "freq": 1318.51}, {"id": 64, "n": 2, "parent": 58, "children": [65, 66], "x": 32.5, "y": 3, "value": 1, "cached": false, "color": "#2fdf9d", "color_dim": "rgba(47,223,157,0.22)", "freq": 1046.5}, {"id": 65, "n": 1, "parent": 64, "children": [], "x": 32.0, "y": 4, "value": 1, "cached": false, "color": "#32dbd5", "color_dim": "rgba(50,219,213,0.22)", "freq": 1318.51}, {"id": 66, "n": 0, "parent": 64, "children": [], "x": 33.0, "y": 4, "value": 0, "cached": false, "color": "#36a7d8", "color_dim": "rgba(54,167,216,0.22)", "freq": 1760.0}];
+const MEMO_N   = [{"id": 0, "n": 8, "parent": null, "children": [1, 14], "x": 6.0078125, "y": 0, "value": 21, "cached": false, "color": "#f29b18", "color_dim": "rgba(242,155,24,0.22)", "freq": 261.63}, {"id": 1, "n": 7, "parent": 0, "children": [2, 13], "x": 5.015625, "y": 1, "value": 13, "cached": false, "color": "#efe11c", "color_dim": "rgba(239,225,28,0.22)", "freq": 293.66}, {"id": 2, "n": 6, "parent": 1, "children": [3, 12], "x": 4.03125, "y": 2, "value": 8, "cached": false, "color": "#b3eb20", "color_dim": "rgba(179,235,32,0.22)", "freq": 392.0}, {"id": 3, "n": 5, "parent": 2, "children": [4, 11], "x": 3.0625, "y": 3, "value": 5, "cached": false, "color": "#70e824", "color_dim": "rgba(112,232,36,0.22)", "freq": 523.25}, {"id": 4, "n": 4, "parent": 3, "children": [5, 10], "x": 2.125, "y": 4, "value": 3, "cached": false, "color": "#31e528", "color_dim": "rgba(49,229,40,0.22)", "freq": 659.26}, {"id": 5, "n": 3, "parent": 4, "children": [6, 9], "x": 1.25, "y": 5, "value": 2, "cached": false, "color": "#2be260", "color_dim": "rgba(43,226,96,0.22)", "freq": 783.99}, {"id": 6, "n": 2, "parent": 5, "children": [7, 8], "x": 0.5, "y": 6, "value": 1, "cached": false, "color": "#2fdf9d", "color_dim": "rgba(47,223,157,0.22)", "freq": 1046.5}, {"id": 7, "n": 1, "parent": 6, "children": [], "x": 0.0, "y": 7, "value": 1, "cached": false, "color": "#32dbd5", "color_dim": "rgba(50,219,213,0.22)", "freq": 1318.51}, {"id": 8, "n": 0, "parent": 6, "children": [], "x": 1.0, "y": 7, "value": 0, "cached": false, "color": "#36a7d8", "color_dim": "rgba(54,167,216,0.22)", "freq": 1760.0}, {"id": 9, "n": 1, "parent": 5, "children": [], "x": 2.0, "y": 6, "value": 1, "cached": true, "color": "rgba(76,76,114,1.00)", "color_dim": "rgba(76,76,114,0.22)", "freq": 659.26}, {"id": 10, "n": 2, "parent": 4, "children": [], "x": 3.0, "y": 5, "value": 1, "cached": true, "color": "rgba(76,76,114,1.00)", "color_dim": "rgba(76,76,114,0.22)", "freq": 523.25}, {"id": 11, "n": 3, "parent": 3, "children": [], "x": 4.0, "y": 4, "value": 2, "cached": true, "color": "rgba(76,76,114,1.00)", "color_dim": "rgba(76,76,114,0.22)", "freq": 392.0}, {"id": 12, "n": 4, "parent": 2, "children": [], "x": 5.0, "y": 3, "value": 3, "cached": true, "color": "rgba(76,76,114,1.00)", "color_dim": "rgba(76,76,114,0.22)", "freq": 329.63}, {"id": 13, "n": 5, "parent": 1, "children": [], "x": 6.0, "y": 2, "value": 5, "cached": true, "color": "rgba(76,76,114,1.00)", "color_dim": "rgba(76,76,114,0.22)", "freq": 261.63}, {"id": 14, "n": 6, "parent": 0, "children": [], "x": 7.0, "y": 1, "value": 8, "cached": true, "color": "rgba(76,76,114,1.00)", "color_dim": "rgba(76,76,114,0.22)", "freq": 196.0}];
+const NAIVE_E  = [{"type": "call", "id": 0, "cached": false}, {"type": "call", "id": 1, "cached": false}, {"type": "call", "id": 2, "cached": false}, {"type": "call", "id": 3, "cached": false}, {"type": "call", "id": 4, "cached": false}, {"type": "call", "id": 5, "cached": false}, {"type": "call", "id": 6, "cached": false}, {"type": "call", "id": 7, "cached": false}, {"type": "return", "id": 7, "value": 1, "cached": false}, {"type": "call", "id": 8, "cached": false}, {"type": "return", "id": 8, "value": 0, "cached": false}, {"type": "return", "id": 6, "value": 1, "cached": false}, {"type": "call", "id": 9, "cached": false}, {"type": "return", "id": 9, "value": 1, "cached": false}, {"type": "return", "id": 5, "value": 2, "cached": false}, {"type": "call", "id": 10, "cached": false}, {"type": "call", "id": 11, "cached": false}, {"type": "return", "id": 11, "value": 1, "cached": false}, {"type": "call", "id": 12, "cached": false}, {"type": "return", "id": 12, "value": 0, "cached": false}, {"type": "return", "id": 10, "value": 1, "cached": false}, {"type": "return", "id": 4, "value": 3, "cached": false}, {"type": "call", "id": 13, "cached": false}, {"type": "call", "id": 14, "cached": false}, {"type": "call", "id": 15, "cached": false}, {"type": "return", "id": 15, "value": 1, "cached": false}, {"type": "call", "id": 16, "cached": false}, {"type": "return", "id": 16, "value": 0, "cached": false}, {"type": "return", "id": 14, "value": 1, "cached": false}, {"type": "call", "id": 17, "cached": false}, {"type": "return", "id": 17, "value": 1, "cached": false}, {"type": "return", "id": 13, "value": 2, "cached": false}, {"type": "return", "id": 3, "value": 5, "cached": false}, {"type": "call", "id": 18, "cached": false}, {"type": "call", "id": 19, "cached": false}, {"type": "call", "id": 20, "cached": false}, {"type": "call", "id": 21, "cached": false}, {"type": "return", "id": 21, "value": 1, "cached": false}, {"type": "call", "id": 22, "cached": false}, {"type": "return", "id": 22, "value": 0, "cached": false}, {"type": "return", "id": 20, "value": 1, "cached": false}, {"type": "call", "id": 23, "cached": false}, {"type": "return", "id": 23, "value": 1, "cached": false}, {"type": "return", "id": 19, "value": 2, "cached": false}, {"type": "call", "id": 24, "cached": false}, {"type": "call", "id": 25, "cached": false}, {"type": "return", "id": 25, "value": 1, "cached": false}, {"type": "call", "id": 26, "cached": false}, {"type": "return", "id": 26, "value": 0, "cached": false}, {"type": "return", "id": 24, "value": 1, "cached": false}, {"type": "return", "id": 18, "value": 3, "cached": false}, {"type": "return", "id": 2, "value": 8, "cached": false}, {"type": "call", "id": 27, "cached": false}, {"type": "call", "id": 28, "cached": false}, {"type": "call", "id": 29, "cached": false}, {"type": "call", "id": 30, "cached": false}, {"type": "call", "id": 31, "cached": false}, {"type": "return", "id": 31, "value": 1, "cached": false}, {"type": "call", "id": 32, "cached": false}, {"type": "return", "id": 32, "value": 0, "cached": false}, {"type": "return", "id": 30, "value": 1, "cached": false}, {"type": "call", "id": 33, "cached": false}, {"type": "return", "id": 33, "value": 1, "cached": false}, {"type": "return", "id": 29, "value": 2, "cached": false}, {"type": "call", "id": 34, "cached": false}, {"type": "call", "id": 35, "cached": false}, {"type": "return", "id": 35, "value": 1, "cached": false}, {"type": "call", "id": 36, "cached": false}, {"type": "return", "id": 36, "value": 0, "cached": false}, {"type": "return", "id": 34, "value": 1, "cached": false}, {"type": "return", "id": 28, "value": 3, "cached": false}, {"type": "call", "id": 37, "cached": false}, {"type": "call", "id": 38, "cached": false}, {"type": "call", "id": 39, "cached": false}, {"type": "return", "id": 39, "value": 1, "cached": false}, {"type": "call", "id": 40, "cached": false}, {"type": "return", "id": 40, "value": 0, "cached": false}, {"type": "return", "id": 38, "value": 1, "cached": false}, {"type": "call", "id": 41, "cached": false}, {"type": "return", "id": 41, "value": 1, "cached": false}, {"type": "return", "id": 37, "value": 2, "cached": false}, {"type": "return", "id": 27, "value": 5, "cached": false}, {"type": "return", "id": 1, "value": 13, "cached": false}, {"type": "call", "id": 42, "cached": false}, {"type": "call", "id": 43, "cached": false}, {"type": "call", "id": 44, "cached": false}, {"type": "call", "id": 45, "cached": false}, {"type": "call", "id": 46, "cached": false}, {"type": "call", "id": 47, "cached": false}, {"type": "return", "id": 47, "value": 1, "cached": false}, {"type": "call", "id": 48, "cached": false}, {"type": "return", "id": 48, "value": 0, "cached": false}, {"type": "return", "id": 46, "value": 1, "cached": false}, {"type": "call", "id": 49, "cached": false}, {"type": "return", "id": 49, "value": 1, "cached": false}, {"type": "return", "id": 45, "value": 2, "cached": false}, {"type": "call", "id": 50, "cached": false}, {"type": "call", "id": 51, "cached": false}, {"type": "return", "id": 51, "value": 1, "cached": false}, {"type": "call", "id": 52, "cached": false}, {"type": "return", "id": 52, "value": 0, "cached": false}, {"type": "return", "id": 50, "value": 1, "cached": false}, {"type": "return", "id": 44, "value": 3, "cached": false}, {"type": "call", "id": 53, "cached": false}, {"type": "call", "id": 54, "cached": false}, {"type": "call", "id": 55, "cached": false}, {"type": "return", "id": 55, "value": 1, "cached": false}, {"type": "call", "id": 56, "cached": false}, {"type": "return", "id": 56, "value": 0, "cached": false}, {"type": "return", "id": 54, "value": 1, "cached": false}, {"type": "call", "id": 57, "cached": false}, {"type": "return", "id": 57, "value": 1, "cached": false}, {"type": "return", "id": 53, "value": 2, "cached": false}, {"type": "return", "id": 43, "value": 5, "cached": false}, {"type": "call", "id": 58, "cached": false}, {"type": "call", "id": 59, "cached": false}, {"type": "call", "id": 60, "cached": false}, {"type": "call", "id": 61, "cached": false}, {"type": "return", "id": 61, "value": 1, "cached": false}, {"type": "call", "id": 62, "cached": false}, {"type": "return", "id": 62, "value": 0, "cached": false}, {"type": "return", "id": 60, "value": 1, "cached": false}, {"type": "call", "id": 63, "cached": false}, {"type": "return", "id": 63, "value": 1, "cached": false}, {"type": "return", "id": 59, "value": 2, "cached": false}, {"type": "call", "id": 64, "cached": false}, {"type": "call", "id": 65, "cached": false}, {"type": "return", "id": 65, "value": 1, "cached": false}, {"type": "call", "id": 66, "cached": false}, {"type": "return", "id": 66, "value": 0, "cached": false}, {"type": "return", "id": 64, "value": 1, "cached": false}, {"type": "return", "id": 58, "value": 3, "cached": false}, {"type": "return", "id": 42, "value": 8, "cached": false}, {"type": "return", "id": 0, "value": 21, "cached": false}];
+const MEMO_E   = [{"type": "call", "id": 0, "cached": false}, {"type": "call", "id": 1, "cached": false}, {"type": "call", "id": 2, "cached": false}, {"type": "call", "id": 3, "cached": false}, {"type": "call", "id": 4, "cached": false}, {"type": "call", "id": 5, "cached": false}, {"type": "call", "id": 6, "cached": false}, {"type": "call", "id": 7, "cached": false}, {"type": "return", "id": 7, "value": 1, "cached": false}, {"type": "call", "id": 8, "cached": false}, {"type": "return", "id": 8, "value": 0, "cached": false}, {"type": "return", "id": 6, "value": 1, "cached": false}, {"type": "call", "id": 9, "cached": true}, {"type": "return", "id": 9, "value": 1, "cached": true}, {"type": "return", "id": 5, "value": 2, "cached": false}, {"type": "call", "id": 10, "cached": true}, {"type": "return", "id": 10, "value": 1, "cached": true}, {"type": "return", "id": 4, "value": 3, "cached": false}, {"type": "call", "id": 11, "cached": true}, {"type": "return", "id": 11, "value": 2, "cached": true}, {"type": "return", "id": 3, "value": 5, "cached": false}, {"type": "call", "id": 12, "cached": true}, {"type": "return", "id": 12, "value": 3, "cached": true}, {"type": "return", "id": 2, "value": 8, "cached": false}, {"type": "call", "id": 13, "cached": true}, {"type": "return", "id": 13, "value": 5, "cached": true}, {"type": "return", "id": 1, "value": 13, "cached": false}, {"type": "call", "id": 14, "cached": true}, {"type": "return", "id": 14, "value": 8, "cached": true}, {"type": "return", "id": 0, "value": 21, "cached": false}];
+const NAIVE_MX = 33.0;
+const MEMO_MX  = 7.0;
+const NAIVE_MD = 7;
+const MEMO_MD  = 7;
+
+// ── 畫布設定 ────────────────────────────────────────────────
+const W = 620, H = 480;
+const PAD = { l:30, r:20, t:44, b:20 };
+const R   = 11;
+
+function nx(node, mx) {
+  return PAD.l + (node.x / Math.max(mx,1)) * (W - PAD.l - PAD.r);
+}
+function ny(node, md) {
+  return PAD.t + (node.y / Math.max(md,1)) * (H - PAD.t - PAD.b);
+}
+
+// ── 狀態 ────────────────────────────────────────────────────
+const nVis = new Set(), mVis = new Set();
+const nRet = new Set(), mRet = new Set();
+const nGlo = new Map(), mGlo = new Map();
+
+function drawTree(cvId, nodes, events, vis, ret, glo, mx, md, count) {
+  const cv  = document.getElementById(cvId);
+  const ctx = cv.getContext('2d');
+
+  ctx.fillStyle = '#04040d';
+  ctx.fillRect(0, 0, W, H);
+
+  // 邊
+  vis.forEach(id => {
+    const n = nodes[id];
+    if (n.parent === null) return;
+    const p = nodes[n.parent];
+    if (!vis.has(p.id)) return;
+    ctx.beginPath();
+    ctx.moveTo(nx(p, mx), ny(p, md));
+    ctx.lineTo(nx(n, mx), ny(n, md));
+    ctx.strokeStyle = n.cached ? '#111120' : (ret.has(id) ? n.color + '35' : '#151525');
+    ctx.setLineDash(n.cached ? [3,3] : []);
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+    ctx.setLineDash([]);
+  });
+
+  // 節點
+  vis.forEach(id => {
+    const n   = nodes[id];
+    const x   = nx(n, mx), y = ny(n, md);
+    const isR = ret.has(id);
+    const gl  = glo.get(id) || 0;
+
+    if (gl > 0) { ctx.shadowColor = n.color; ctx.shadowBlur = 20 * gl; }
+
+    ctx.beginPath();
+    ctx.arc(x, y, R, 0, Math.PI * 2);
+    ctx.fillStyle   = isR ? n.color : n.color_dim;
+    ctx.fill();
+
+    if (n.cached) {
+      ctx.strokeStyle = '#2a2a44';
+      ctx.setLineDash([2,2]);
+    } else {
+      ctx.strokeStyle = isR ? n.color + 'bb' : '#1a1a2e';
+      ctx.setLineDash([]);
+    }
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.shadowBlur = 0;
+
+    ctx.fillStyle = isR ? (n.cached ? '#556' : '#fff') : '#334';
+    ctx.font = `${isR && !n.cached ? 'bold ' : ''}9px monospace`;
+    ctx.textAlign    = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(n.n, x, y);
+  });
+
+  // 節點計數
+  document.getElementById(cvId === 'naive-cv' ? 'naive-count' : 'memo-count')
+          .textContent = vis.size;
+}
+
+// ── 音訊 ────────────────────────────────────────────────────
+let ac = null;
+function getAC() {
+  if (!ac) ac = new (window.AudioContext || window.webkitAudioContext)();
+  return ac;
+}
+function beep(freq, when, dur, gain, type='triangle') {
+  const c = getAC();
+  const o = c.createOscillator(), g = c.createGain();
+  o.type = type; o.frequency.value = freq;
+  g.gain.setValueAtTime(gain, when);
+  g.gain.linearRampToValueAtTime(0.0001, when + dur);
+  o.connect(g); g.connect(c.destination);
+  o.start(when); o.stop(when + dur + 0.01);
+}
+
+// ── 播放 ────────────────────────────────────────────────────
+let playing = false, rafId = null;
+let ni = 0, mi = 0, lastT = 0;
+
+function togglePlay() {
+  if (playing) pause(); else play();
+}
+
+async function play() {
+  const a = getAC();
+  if (a.state === 'suspended') await a.resume();
+  playing = true;
+  document.getElementById('btn').textContent = '❙❙ 暫停';
+  document.getElementById('btn').classList.add('playing');
+  lastT = performance.now();
+  rafId = requestAnimationFrame(step);
+}
+
+function pause() {
+  playing = false;
+  document.getElementById('btn').textContent = '▶ 繼續';
+  document.getElementById('btn').classList.remove('playing');
+  if (rafId) cancelAnimationFrame(rafId);
+}
+
+function doReset() {
+  pause();
+  nVis.clear(); mVis.clear(); nRet.clear(); mRet.clear();
+  nGlo.clear(); mGlo.clear();
+  ni = 0; mi = 0;
+  document.getElementById('btn').textContent = '▶ 播放';
+  document.getElementById('summary').textContent = '';
+  document.getElementById('summary').classList.remove('done');
+  document.getElementById('naive-count').textContent = '0';
+  document.getElementById('memo-count').textContent  = '0';
+  drawTree('naive-cv', NAIVE_N, NAIVE_E, nVis, nRet, nGlo, NAIVE_MX, NAIVE_MD);
+  drawTree('memo-cv',  MEMO_N,  MEMO_E,  mVis, mRet, mGlo, MEMO_MX,  MEMO_MD);
+}
+
+function decayGlow(map) {
+  map.forEach((v, k) => {
+    const v2 = v - 0.12;
+    if (v2 <= 0) map.delete(k); else map.set(k, v2);
+  });
+}
+
+function processEvent(ev, nodes, vis, ret, glo, side) {
+  const n   = nodes[ev.id];
+  const a   = getAC();
+  const now = a.currentTime;
+  if (ev.type === 'call') {
+    vis.add(ev.id);
+    beep(n.freq, now, ev.cached ? 0.05 : 0.08,
+         ev.cached ? 0.06 : 0.14,
+         ev.cached ? 'sine' : 'triangle');
+  } else {
+    ret.add(ev.id);
+    glo.set(ev.id, 1.0);
+    beep(n.freq * (ev.cached ? 1 : 2), now, ev.cached ? 0.06 : 0.11,
+         ev.cached ? 0.05 : 0.10, 'sine');
+  }
+}
+
+function step(now) {
+  if (!playing) return;
+  const ms = parseInt(document.getElementById('spd').value);
+  if (now - lastT < ms) { rafId = requestAnimationFrame(step); return; }
+  lastT = now;
+
+  const nDone = ni >= NAIVE_E.length;
+  const mDone = mi >= MEMO_E.length;
+
+  if (!nDone) { processEvent(NAIVE_E[ni++], NAIVE_N, nVis, nRet, nGlo, 'naive'); }
+  if (!mDone) { processEvent(MEMO_E[mi++],  MEMO_N,  mVis, mRet, mGlo, 'memo');  }
+
+  decayGlow(nGlo); decayGlow(mGlo);
+
+  drawTree('naive-cv', NAIVE_N, NAIVE_E, nVis, nRet, nGlo, NAIVE_MX, NAIVE_MD);
+  drawTree('memo-cv',  MEMO_N,  MEMO_E,  mVis, mRet, mGlo, MEMO_MX,  MEMO_MD);
+
+  if (nDone && mDone) {
+    pause();
+    document.getElementById('btn').textContent = '▶ 重播';
+    const s = document.getElementById('summary');
+    s.textContent = `沒有記憶：${NAIVE_N.length} 個節點   ·   有記憶：${MEMO_N.length} 個節點   ·   差 ${NAIVE_N.length - MEMO_N.length} 個`;
+    s.classList.add('done');
+  } else {
+    rafId = requestAnimationFrame(step);
+  }
+}
+
+// 初始靜態
+drawTree('naive-cv', NAIVE_N, NAIVE_E, nVis, nRet, nGlo, NAIVE_MX, NAIVE_MD);
+drawTree('memo-cv',  MEMO_N,  MEMO_E,  mVis, mRet, mGlo, MEMO_MX,  MEMO_MD);
+</script>
+</body>
+</html>

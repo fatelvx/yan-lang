@@ -1,0 +1,218 @@
+; 04_lsystem.yn
+;
+; 用言（Yán）生成植物。
+;
+; 這個檔案做三件事：
+;   1. 字串重寫（L-system 規則展開）
+;   2. 海龜直譯（字串 → 線段）
+;   3. SVG 輸出
+;
+; 全部用言本身寫。
+; 沒有 import，沒有 Python。
+;
+; 用法：
+;   python -X utf8 yan.py examples/04_lsystem.yn > plant.svg
+;   然後用瀏覽器打開 plant.svg
+
+; ─────────────────────────────────────────────────────────────
+; 字串重寫
+; ─────────────────────────────────────────────────────────────
+
+; rules : ((symbol . replacement) ...)
+; 每個字元查表，找不到就原樣保留
+
+(define (ls-step rules s)
+  (apply string-append
+    (map (lambda (ch)
+           (let ((r (assoc ch rules)))
+             (if r (cadr r) ch)))
+         (string->list s))))
+
+(define (ls-run rules axiom n)
+  (let loop ((s axiom) (i n))
+    (if (= i 0) s
+        (loop (ls-step rules s) (- i 1)))))
+
+
+; ─────────────────────────────────────────────────────────────
+; 隨機規則
+;
+; 不是完全確定的——每次 F 展開時，
+; 有一定機率選擇稍微不同的分支形狀。
+; 每次執行，植物長得不一樣。
+; ─────────────────────────────────────────────────────────────
+
+(define (stochastic-step s angle-variation)
+  (apply string-append
+    (map (lambda (ch)
+           (cond
+             ((equal? ch "X")
+              ; 主生長點：隨機選擇左傾或右傾
+              (if (< (random) 0.5)
+                  "F+[[X]-X]-F[-FX]+X"
+                  "F-[[X]+X]+F[+FX]-X"))
+             ((equal? ch "F")
+              ; 莖：有時加一點扭曲
+              (let ((r (random)))
+                (cond ((< r 0.1) "F+F")
+                      ((< r 0.2) "F-F")
+                      (else      "FF"))))
+             (else ch)))
+         (string->list s))))
+
+(define (stochastic-run axiom iters)
+  (let loop ((s axiom) (i iters))
+    (if (= i 0) s
+        (loop (stochastic-step s 25.0) (- i 1)))))
+
+
+; ─────────────────────────────────────────────────────────────
+; 海龜直譯器
+;
+; 符號對應：
+;   F G → 往前走一步，記錄線段
+;   +   → 左轉 angle 度
+;   -   → 右轉 angle 度
+;   [   → 儲存狀態，進入分支（深度 +1）
+;   ]   → 還原狀態，離開分支
+;   其他 → 忽略（生長符號 X 等）
+;
+; 回傳：((x0 y0 x1 y1 depth) ...)
+; ─────────────────────────────────────────────────────────────
+
+(define (turtle-segs str angle-deg)
+  (let loop ((chs  (string->list str))
+             (x    0.0)
+             (y    0.0)
+             (a    90.0)     ; 初始朝上
+             (d    0)        ; 分支深度
+             (stk  '())
+             (acc  '()))
+    (if (null? chs)
+        (reverse acc)
+        (let ((c    (car chs))
+              (rest (cdr chs)))
+          (cond
+            ; 前進：產生一條線段
+            ((or (equal? c "F") (equal? c "G"))
+             (let* ((rad (* a (/ pi 180.0)))
+                    (nx  (+ x (cos rad)))
+                    (ny  (+ y (sin rad))))
+               (loop rest nx ny a d stk
+                     (cons (list x y nx ny d) acc))))
+            ; 轉向
+            ((equal? c "+") (loop rest x y (+ a angle-deg) d stk acc))
+            ((equal? c "-") (loop rest x y (- a angle-deg) d stk acc))
+            ; 進入分支
+            ((equal? c "[")
+             (loop rest x y a (+ d 1)
+                   (cons (list x y a d) stk) acc))
+            ; 離開分支
+            ((equal? c "]")
+             (if (null? stk)
+                 (loop rest x y a d stk acc)
+                 (let ((sv (car stk)))
+                   (loop rest
+                         (list-ref sv 0)
+                         (list-ref sv 1)
+                         (list-ref sv 2)
+                         (list-ref sv 3)
+                         (cdr stk)
+                         acc))))
+            ; 忽略
+            (else (loop rest x y a d stk acc)))))))
+
+
+; ─────────────────────────────────────────────────────────────
+; SVG 輸出
+; ─────────────────────────────────────────────────────────────
+
+; 深度 → 顏色：根越暗越粗，梢越亮越細
+(define palette
+  (list "#2d5a3d"    ; 0  深綠（根）
+        "#3a7a52"    ; 1
+        "#4a9e68"    ; 2
+        "#60bd80"    ; 3
+        "#82d49e"    ; 4
+        "#aae8bc"    ; 5
+        "#d0f5d8"    ; 6
+        "#edfff2"))  ; 7  近白（梢）
+
+(define (depth->color d)
+  (list-ref palette (min d (- (length palette) 1))))
+
+(define (depth->width d)
+  (max 0.3 (- 2.8 (* d 0.35))))
+
+; 浮點數 → 乾淨的整數字串（SVG 座標用）
+(define (coord->str n)
+  (number->string (inexact->exact (round n))))
+
+; 生成一條 SVG line 元素
+(define (svg-line x0 y0 x1 y1 color w)
+  (string-append
+    "  <line"
+    " x1='" (coord->str x0) "' y1='" (coord->str y0)
+    "' x2='" (coord->str x1) "' y2='" (coord->str y1)
+    "' stroke='" color "'"
+    " stroke-width='" (number->string w)
+    "' stroke-linecap='round'"
+    " filter='url(#glow)'/>"))
+
+; 把線段列表轉成完整 SVG 字串
+(define (segs->svg segs width height)
+  (let* (
+    ; 計算邊界
+    (xs    (apply append
+                  (map (lambda (s) (list (car s) (caddr s))) segs)))
+    (ys    (apply append
+                  (map (lambda (s) (list (cadr s) (cadddr s))) segs)))
+    (xlo   (minimum xs))   (xhi (maximum xs))
+    (ylo   (minimum ys))   (yhi (maximum ys))
+    (pad   40)
+    (scale (min (/ (- width  (* 2 pad)) (max 0.001 (- xhi xlo)))
+                (/ (- height (* 2 pad)) (max 0.001 (- yhi ylo)))))
+    ; 座標變換（翻轉 Y 軸，讓植物朝上生長）
+    (tx    (lambda (x) (+ pad (* (- x xlo) scale))))
+    (ty    (lambda (y) (+ pad (* (- yhi y) scale)))))
+    ; 輸出 SVG
+    (display "<?xml version='1.0' encoding='UTF-8'?>") (newline)
+    (display
+      (string-append
+        "<svg xmlns='http://www.w3.org/2000/svg'"
+        " width='"  (number->string width)
+        "' height='" (number->string height)
+        "' style='background:#050e07'>"))
+    (newline)
+    ; 選擇性加發光濾鏡
+    (display "  <defs>") (newline)
+    (display "    <filter id='glow' x='-20%' y='-20%' width='140%' height='140%'>") (newline)
+    (display "      <feGaussianBlur stdDeviation='1.2' result='blur'/>") (newline)
+    (display "      <feMerge><feMergeNode in='blur'/><feMergeNode in='SourceGraphic'/></feMerge>") (newline)
+    (display "    </filter>") (newline)
+    (display "  </defs>") (newline)
+    ; 畫所有線段
+    (for-each
+      (lambda (seg)
+        (let* ((d     (list-ref seg 4))
+               (color (depth->color d))
+               (w     (depth->width d)))
+          (display
+            (svg-line (tx (car seg))   (ty (cadr seg))
+                      (tx (caddr seg)) (ty (cadddr seg))
+                      color w))
+          (newline)))
+      segs)
+    (display "</svg>") (newline)))
+
+
+; ─────────────────────────────────────────────────────────────
+; 執行
+; ─────────────────────────────────────────────────────────────
+
+; 展開並詮釋
+(define plant-str  (stochastic-run "X" 5))
+(define plant-segs (turtle-segs plant-str 25.0))
+
+; 輸出 SVG
+(segs->svg plant-segs 900 800)

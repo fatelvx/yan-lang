@@ -1,0 +1,54 @@
+; 16_memory.yn — 記憶系統展示
+; 展示 recall / recall-all / recall-confident / 信心衰退
+
+(load "yan/lib/list.yn")
+(load "yan/lib/strings.yn")
+
+; ── 認識一個人 ──────────────────────────────────────
+(define name "Kesrie")
+
+(define visits (person-visits name))
+
+(display "=== 記憶系統 ===") (newline)
+(printf "  見過 %s 次\n" visits)
+
+; ── 回想最近一條記憶 ──────────────────────────────
+(define latest (recall name))
+
+(if (null? latest)
+  (begin
+    (display "  沒有關於這個人的記憶。") (newline))
+  (begin
+    (printf "  最近的記憶：\"%s\"\n" (car latest))
+    (printf "  記憶信心：%.2f\n" (cadr latest))))
+
+; ── 列出所有記憶及信心 ───────────────────────────
+(define all-mem (recall-all name))
+
+(display "  所有記憶：") (newline)
+(for-each
+  (lambda (pair)
+    (printf "    [%.2f] %s\n" (cadr pair) (car pair)))
+  all-mem)
+
+; ── 只看信心夠高的記憶 ──────────────────────────
+(define threshold 0.7)
+(define strong (recall-confident name threshold))
+
+(if (null? strong)
+  (printf "  沒有信心 >= %.1f 的記憶。\n" threshold)
+  (printf "  信心 >= %.1f 的最新記憶：\"%s\" (%.2f)\n"
+          threshold (car strong) (cadr strong)))
+
+; ── 釘住一條記憶 ────────────────────────────────
+(pin name "在創造言")
+
+(display "  （已釘住：「在創造言」）") (newline)
+
+; 確認釘住的記憶衰退極慢
+(define all-after (recall-all name))
+(define pinned-entry (list-ref all-after (- (length all-after) 1)))
+(printf "  釘住的記憶：\"%s\"  conf=%.4f  pinned=%s\n"
+        (car pinned-entry)
+        (cadr pinned-entry)
+        (if (caddr pinned-entry) "是" "否"))

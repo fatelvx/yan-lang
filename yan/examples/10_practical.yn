@@ -1,0 +1,65 @@
+; 10_practical.yn — 言能做實際的事了
+;
+; 展示：try/catch、檔案讀寫、目錄操作、模組概念
+
+; ── try / catch ──────────────────────────────────────────────
+
+(define (safe-divide a b)
+  (try
+    (/ a b)
+    (catch e
+      (string-append "錯誤：" e))))
+
+(display (safe-divide 10 2))   (newline)   ; 5
+(display (safe-divide 10 0))   (newline)   ; 錯誤：division by zero
+
+; ── 寫檔案，讀回來 ────────────────────────────────────────────
+
+(write-file "hello.txt" "言的第一個檔案\n你好，世界\n")
+
+(let ((content (read-file "hello.txt")))
+  (display "讀回來了：") (newline)
+  (display content))
+
+; ── 用 file->lines 處理每一行 ─────────────────────────────────
+
+(define lines (file->lines "hello.txt"))
+(display "共 ")
+(display (length lines))
+(display " 行") (newline)
+
+(define (number-lines lst n)
+  (match lst
+    (() '())
+    ((l . rest)
+     (cons (string-append (number->string n) ". " l)
+           (number-lines rest (+ n 1))))))
+
+(for-each
+  (lambda (l) (display l) (newline))
+  (number-lines lines 1))
+
+; ── 檢查檔案存在 ───────────────────────────────────────────────
+
+(display (file-exists? "hello.txt"))     (newline)   ; #t
+(display (file-exists? "ghost.txt"))     (newline)   ; #f
+
+; ── 附加內容 ──────────────────────────────────────────────────
+
+(append-file "hello.txt" "第三行加進來\n")
+(display (length (file->lines "hello.txt")))  (newline)  ; 3
+
+; ── 目錄 ──────────────────────────────────────────────────────
+
+(display (current-directory)) (newline)
+
+(let ((yn-files (filter
+                  (lambda (f) (string-contains f ".yn"))
+                  (list-directory "yan/examples"))))
+  (display "examples/ 裡的 .yn 檔：") (newline)
+  (for-each (lambda (f) (display "  ") (display f) (newline)) yn-files))
+
+; ── 清理 ───────────────────────────────────────────────────────
+
+(delete-file "hello.txt")
+(display "完成，hello.txt 已刪除") (newline)

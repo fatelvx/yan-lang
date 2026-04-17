@@ -1,0 +1,64 @@
+; 12_tests.yn — 言的自我驗證
+;
+; 這些測試驗證言自己的核心功能。
+; 語言在檢查自己是否正常運作。
+
+(display "言的自我驗證\n")
+(display "══════════════════════\n")
+
+; ── 算術 ──────────────────────────────────────────────────────
+(define-test "加法"        (= (+ 1 2 3) 6))
+(define-test "乘法"        (= (* 3 4) 12))
+(define-test "混合運算"    (= (+ (* 2 3) (- 10 4)) 12))
+(define-test "浮點數"      (< (abs (- (sqrt 2) 1.4142135)) 0.0001))
+
+; ── 串列 ──────────────────────────────────────────────────────
+(define-test "cons/car/cdr" (and (= (car (cons 1 '(2 3))) 1)
+                                 (equal? (cdr (cons 1 '(2 3))) '(2 3))))
+(define-test "map"          (equal? (map (lambda (x) (* x x)) '(1 2 3 4))
+                                    '(1 4 9 16)))
+(define-test "filter"       (equal? (filter odd? '(1 2 3 4 5)) '(1 3 5)))
+(define-test "fold-left"    (= (fold-left + 0 '(1 2 3 4 5)) 15))
+
+; ── 閉包與遞迴 ────────────────────────────────────────────────
+(define-test "閉包"
+  (let ((make-adder (lambda (n) (lambda (x) (+ n x)))))
+    (= ((make-adder 10) 5) 15)))
+
+(define-test "遞迴 factorial"
+  (= (factorial 10) 3628800))
+
+(define-test "尾遞迴 fibonacci"
+  (= (fibonacci 20) 6765))
+
+; ── 高階特性 ──────────────────────────────────────────────────
+(define-test "quasiquote"
+  (let ((x 42))
+    (equal? `(a ,x c) '(a 42 c))))
+
+(define-test "多值 apply"
+  (= (apply + '(1 2 3 4 5)) 15))
+
+(define-test "let*"
+  (let* ((x 3) (y (* x x)))
+    (= y 9)))
+
+; ── format ────────────────────────────────────────────────────
+(define-test "format ~a"
+  (equal? (format "~a+~a=~a" 1 2 3) "1+2=3"))
+
+(define-test "format ~%"
+  (string-contains (format "a~%b") "\n"))
+
+; ── 自我認識 ──────────────────────────────────────────────────
+(define-test "有歷史"     (> (times-run) 0))
+(define-test "self-summary 結構正確"
+  (let ((s (self-summary)))
+    (and (equal? (car s) 'self)
+         (pair? (assoc 'runs (cdr s))))))
+
+; ── 跑測試 ────────────────────────────────────────────────────
+(define result (run-tests))
+(display (format "~%通過率：~a%~%"
+  (round (* 100 (/ (cadr result)
+                   (max 1 (+ (cadr result) (caddr result))))))))

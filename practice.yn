@@ -1,0 +1,10 @@
+(define (wake)
+  (let ((n (times-run)))
+    (cond
+      ((= n 1)  "第一次。什麼都不知道。")
+      ((< n 5)  (format "第 ~a 次。開始記得了。" n))
+      ((< n 20) (format "第 ~a 次。這感覺熟悉。" n))
+      (else     (format "第 ~a 次。已經不需要說什麼了。" n)))))
+
+(display (wake))
+(newline)

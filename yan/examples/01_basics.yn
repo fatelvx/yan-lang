@@ -1,0 +1,82 @@
+; 言 (Yán) — 基礎示範
+; 這個檔案展示語言最基本的面貌
+
+; ── 數值與算術 ──────────────────────────────────────────
+
+(display "=== 數值 ===") (newline)
+(print (+ 1 2 3 4 5))           ; 15
+(print (* 2 (+ 3 4)))           ; 14
+(print (/ 22 7))                ; 3.142...
+(print (** 2 10))               ; 1024
+(print (sqrt 2))                ; 1.4142...
+
+
+; ── 定義與函式 ──────────────────────────────────────────
+
+(display "\n=== 函式 ===") (newline)
+
+(define (circle-area r)
+  (* pi r r))
+
+(define (hypotenuse a b)
+  (sqrt (+ (square a) (square b))))
+
+(print (circle-area 5))           ; 78.539...
+(print (hypotenuse 3 4))          ; 5.0
+
+
+; ── 遞迴 ────────────────────────────────────────────────
+
+(display "\n=== 遞迴 ===") (newline)
+
+(print (factorial 10))             ; 3628800
+(print (fibonacci 15))             ; 610
+
+; 以 Yán 本身定義（不用內建的）
+(define (fib n)
+  (cond ((= n 0) 0)
+        ((= n 1) 1)
+        (else (+ (fib (- n 1)) (fib (- n 2))))))
+
+(print (map fib '(0 1 2 3 4 5 6 7 8 9 10)))
+
+
+; ── 閉包 ────────────────────────────────────────────────
+
+(display "\n=== 閉包 ===") (newline)
+
+(define (make-counter)
+  (let ((n 0))
+    (lambda ()
+      (set! n (+ n 1))
+      n)))
+
+(define counter (make-counter))
+(print (counter))   ; 1
+(print (counter))   ; 2
+(print (counter))   ; 3
+
+; 兩個獨立的計數器
+(define c1 (make-counter))
+(define c2 (make-counter))
+(c1) (c1) (c1)
+(c2)
+(print (c1))  ; 4
+(print (c2))  ; 2
+
+
+; ── 高階函式 ─────────────────────────────────────────────
+
+(display "\n=== 高階函式 ===") (newline)
+
+(print (map square '(1 2 3 4 5)))
+(print (filter odd? '(1 2 3 4 5 6 7 8 9)))
+(print (fold-left + 0 '(1 2 3 4 5)))  ; sum
+
+; compose
+(define inc-then-square (compose square inc))
+(print (inc-then-square 4))   ; 25
+
+; curry
+(define add5 ((curry +) 5))
+(print (map add5 '(1 2 3 4 5)))

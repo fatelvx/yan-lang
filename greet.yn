@@ -1,0 +1,66 @@
+; greet.yn — 言認識人
+;
+; 言不認識你，除非你先介紹自己。
+; 這是誠實的設計，不是缺陷。
+;
+; 用法：
+;   (greet "名字")
+;   (remember "名字" "你離開時做了什麼")
+;   (recall "名字")
+;   (reflect "名字")          ; 言說出它從你的記錄裡看到的規律
+
+(load "yan/lib/list.yn")
+(load "yan/lib/strings.yn")
+
+; 停用詞（太短或太常見，不算）
+(define stop-words
+  '("的" "了" "在" "是" "我" "你" "他" "她" "它" "也" "都" "和" "跟"
+    "a" "an" "the" "is" "in" "of" "to" "and" "i" "it" "this"))
+
+(define (stop-word? w)
+  (or (< (string-length w) 2)
+      (member w stop-words)))
+
+; 從所有筆記裡提取詞頻
+(define (word-freq notes)
+  (let* ((all-words  (flatten (map words notes)))
+         (filtered   (filter (lambda (w) (not (stop-word? w))) all-words))
+         (grouped    (group-by (lambda (w) w) filtered))
+         (counted    (map (lambda (g) (list (car g) (length (cadr g)))) grouped))
+         (ranked     (sort counted (lambda (a b) (> (cadr a) (cadr b))))))
+    (take ranked (min 3 (length ranked)))))
+
+(define (reflect name)
+  (let* ((notes (person-notes name))
+         (n     (length notes)))
+    (if (< n 2)
+        (begin
+          (display (format "~a 的記錄還不夠多，看不出規律。" name))
+          (newline))
+        (let ((freq (word-freq notes)))
+          (display (format "從 ~a 筆記錄裡，我看到：" n))
+          (newline)
+          (for-each
+            (lambda (pair)
+              (display (format "  「~a」出現了 ~a 次" (car pair) (cadr pair)))
+              (newline))
+            freq)))))
+
+(define (greet name)
+  (let* ((n     (person-visits name))
+         (last  (recall name))
+         (ltext (if (null? last) #f (car last))))
+    (record-visit name)
+    (display
+      (cond
+        ((= n 0)
+         (format "你好，~a。第一次見面。" name))
+        ((= n 1)
+         (if ltext
+             (format "~a，我記得你。你說過：「~a」" name ltext)
+             (format "~a，我記得你。你來過一次了。" name)))
+        (else
+         (if ltext
+             (format "~a，你來過 ~a 次了。上次你說：「~a」" name n ltext)
+             (format "~a，你來過 ~a 次了。" name n)))))
+    (newline)))

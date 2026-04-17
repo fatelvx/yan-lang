@@ -1,0 +1,1 @@
+((lambda (x n) (display (list x (list (quote quote) x) (+ n 1))) (newline) (display "; 第 ") (display n) (display " 代")) (quote (lambda (x n) (display (list x (list (quote quote) x) (+ n 1))) (newline) (display "; 第 ") (display n) (display " 代"))) 0)

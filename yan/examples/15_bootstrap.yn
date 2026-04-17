@@ -1,0 +1,103 @@
+; 15_bootstrap.yn — 語言理解自己
+;
+; 這一次不只是算術，是真實的 Yán 程式碼
+; 通過元直譯器執行。
+;
+; 三層，同一個函式，同一個答案。
+; 差別是路徑。
+
+(load "yan/examples/05_meta.yn")
+
+
+; ══════════════════════════════════════════════════════════════
+; 第一層：言本身直接執行
+; ══════════════════════════════════════════════════════════════
+
+(define (fib n)
+  (if (< n 2) n
+      (+ (fib (- n 1)) (fib (- n 2)))))
+
+(define (my-map f lst)
+  (if (null? lst) '()
+      (cons (f (car lst)) (my-map f (cdr lst)))))
+
+(display "\n語言理解自己\n")
+(display "══════════════════════════════════════\n\n")
+
+(display "第一層（言本身）\n")
+(printf "  (fib 10)           = ~a\n" (fib 10))
+(printf "  (factorial 8)      = ~a\n" (factorial 8))
+(printf "  (map square 1..5)  = ~a\n" (map square '(1 2 3 4 5)))
+(printf "  (filter odd? 1..9) = ~a\n" (filter odd? '(1 2 3 4 5 6 7 8 9)))
+
+
+; ══════════════════════════════════════════════════════════════
+; 第二層：言執行元直譯器執行同樣的函式
+;
+; fib / factorial / square / odd? 已在 05_meta.yn 的
+; meta-global 裡定義好了
+; ══════════════════════════════════════════════════════════════
+
+(display "\n第二層（元直譯器）\n")
+(printf "  (fibonacci 10)      = ~a\n" (yn-run '(fibonacci 10)))
+(printf "  (factorial 8)       = ~a\n" (yn-run '(factorial 8)))
+(printf "  (map square 1..5)   = ~a\n"
+        (yn-run '(my-map square '(1 2 3 4 5))))
+(printf "  (filter odd? 1..9)  = ~a\n"
+        (yn-run '(my-filter odd? '(1 2 3 4 5 6 7 8 9))))
+
+
+; ══════════════════════════════════════════════════════════════
+; 第三層：元直譯器執行元直譯器
+;
+; yn-eval / yn-apply / tiny-env 已在 05_meta.yn 末尾注入
+; 現在讓第二層的 yn-eval 呼叫一個更完整的第三層環境
+; ══════════════════════════════════════════════════════════════
+
+; 建立第三層環境：把 meta-global 本身傳進去
+(env-define! 'meta-global meta-global)
+
+(display "\n第三層（元元直譯器）\n")
+
+; 第三層執行算術
+(printf "  (+ 3 (* 4 5))    = ~a\n"
+        (yn-run '(yn-eval '(+ 3 (* 4 5)) tiny-env)))
+
+; 第三層執行 lambda
+(printf "  (square 9)       = ~a\n"
+        (yn-run '(yn-eval '((lambda (x) (* x x)) 9) tiny-env)))
+
+; 第三層執行 fib（在元元環境裡手動定義）
+(yn-run
+  '(yn-eval
+    '(define (fib3 n)
+       (if (= n 0) 0
+           (if (= n 1) 1
+               (+ (fib3 (- n 1)) (fib3 (- n 2))))))
+    tiny-env))
+
+; fib3 現在定義在 tiny-env 裡... 但 tiny-env 是快照
+; 改用 meta-global 傳給第三層
+(printf "  (fib 8) 第三層  = ~a\n"
+        (yn-run
+          '(let ((env3 (list (list '+ (list 'primitive +))
+                             (list '* (list 'primitive *))
+                             (list '- (list 'primitive -))
+                             (list '= (list 'primitive =))
+                             (list 'if 'if))))
+             (yn-eval
+               '(let loop ((a 0) (b 1) (k 8))
+                  (if (= k 0) a (loop b (+ a b) (- k 1))))
+               env3))))
+
+
+; ══════════════════════════════════════════════════════════════
+; 結語
+; ══════════════════════════════════════════════════════════════
+
+(display "\n──\n\n")
+(display "三層，同一個答案。\n")
+(display "第一層：言本身。\n")
+(display "第二層：言執行言。\n")
+(display "第三層：言執行言執行言。\n\n")
+(display "「語言理解自己」不只是詩，是技術上的事實。\n")

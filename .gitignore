@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# 個人記憶 / 使用紀錄（不進 repo）
+yan/journal.yn
+yan/journal.archive.yn
+yan/journals/
+
+# AI 對話測試（本機用）
+ai_chat.py
+_chat_test.txt
+
+# 環境變數
+.env
+*.env
+
+# 生成的圖像
+*.svg
+*.png
+
+# 編輯器
+.vscode/
+.idea/
+*.swp

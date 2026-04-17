@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>遞迴的地形</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: #050510;
+  color: #667;
+  font-family: 'Courier New', monospace;
+  padding: 44px 52px;
+}
+h1 {
+  font-size: 12px;
+  color: #445;
+  letter-spacing: 5px;
+  text-transform: uppercase;
+  margin-bottom: 5px;
+}
+.sub {
+  font-size: 10px;
+  color: #2a2a3a;
+  margin-bottom: 34px;
+  letter-spacing: 1px;
+}
+.track-name {
+  font-size: 10px;
+  color: #334;
+  letter-spacing: 3px;
+  margin-bottom: 5px;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.track-stat { color: #222233; font-size: 9px; }
+canvas {
+  display: block;
+  border: 1px solid #0d0d1a;
+  border-radius: 2px;
+  margin-bottom: 4px;
+}
+.gap { height: 22px; }
+
+/* 當前狀態列 */
+.status {
+  display: flex;
+  gap: 40px;
+  margin: 18px 0 22px;
+  align-items: center;
+}
+.stat-block {
+  min-width: 160px;
+}
+.stat-label {
+  font-size: 9px;
+  color: #223;
+  letter-spacing: 2px;
+  margin-bottom: 4px;
+}
+.stat-fn {
+  font-size: 20px;
+  font-weight: bold;
+  color: #1a1a28;
+  transition: color 0.1s, text-shadow 0.1s;
+  min-height: 26px;
+}
+.stat-depth {
+  font-size: 10px;
+  color: #222;
+  margin-top: 2px;
+  transition: color 0.15s;
+}
+/* 深度計 */
+.depth-meter {
+  flex: 1;
+  position: relative;
+}
+.depth-bar-bg {
+  height: 6px;
+  background: #0a0a18;
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+.depth-bar {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.08s, background 0.08s;
+  width: 0%;
+}
+.depth-num {
+  font-size: 9px;
+  color: #2a2a3a;
+  letter-spacing: 1px;
+}
+
+/* 控制 */
+.controls {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  margin-bottom: 26px;
+}
+button {
+  background: #0c0c1c;
+  color: #556;
+  border: 1px solid #181828;
+  padding: 8px 22px;
+  cursor: pointer;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 12px;
+  letter-spacing: 1px;
+  transition: all 0.15s;
+}
+button:hover { background: #141430; color: #88a; }
+button.playing { color: #6cf; border-color: #369; background: #0a1525; }
+label { font-size: 10px; color: #2a2a3a; }
+input[type=range] { width: 90px; accent-color: #335; }
+.spd-v { font-size: 10px; color: #334; }
+</style>
+</head>
+<body>
+
+<h1>遞迴的地形</h1>
+<div class="sub">factorial 10 — fib 8 · 堆疊深度作為地形</div>
+
+<div class="controls">
+  <button id="btn" onclick="togglePlay()">▶ 播放</button>
+  <label>速度</label>
+  <input type="range" id="spd" min="20" max="300" value="80"
+         oninput="document.getElementById('spd-v').textContent=this.value+'ms'">
+  <span class="spd-v" id="spd-v">80ms</span>
+</div>
+
+<div class="track-name">
+  FACTORIAL 10
+  <span class="track-stat" id="fac-stat">53 步 · 最大深度 12</span>
+</div>
+<canvas id="fac-cv" width="1280" height="160"></canvas>
+
+<div class="gap"></div>
+
+<div class="track-name">
+  FIB 8
+  <span class="track-stat" id="fib-stat">300 步 · 最大深度 9</span>
+</div>
+<canvas id="fib-cv" width="1280" height="160"></canvas>
+
+<div class="status">
+  <div class="stat-block">
+    <div class="stat-label">FACTORIAL</div>
+    <div class="stat-fn" id="fac-fn">—</div>
+    <div class="stat-depth" id="fac-d"></div>
+  </div>
+
+  <div class="depth-meter">
+    <div class="stat-label" style="margin-bottom:8px;">深度對比</div>
+    <div class="stat-label">factorial</div>
+    <div class="depth-bar-bg"><div class="depth-bar" id="fac-bar"></div></div>
+    <div class="stat-label" style="margin-top:8px;">fib</div>
+    <div class="depth-bar-bg"><div class="depth-bar" id="fib-bar"></div></div>
+  </div>
+
+  <div class="stat-block" style="text-align:right">
+    <div class="stat-label">FIB</div>
+    <div class="stat-fn" id="fib-fn">—</div>
+    <div class="stat-depth" id="fib-d"></div>
+  </div>
+</div>
+
+<script>
+const FAC = [{"name": "factorial", "depth": 1, "freq": 1760.0, "color": "#40e57c"}, {"name": "if", "depth": 1, "freq": 1760.0, "color": "#4840e5"}, {"name": "=", "depth": 2, "freq": 1174.659, "color": "#e5dd40"}, {"name": "*", "depth": 1, "freq": 1760.0, "color": "#9de540"}, {"name": "factorial", "depth": 2, "freq": 1174.659, "color": "#40e57c"}, {"name": "-", "depth": 3, "freq": 880.0, "color": "#e540c7"}, {"name": "if", "depth": 2, "freq": 1174.659, "color": "#4840e5"}, {"name": "=", "depth": 3, "freq": 880.0, "color": "#e5dd40"}, {"name": "*", "depth": 2, "freq": 1174.659, "color": "#9de540"}, {"name": "factorial", "depth": 3, "freq": 880.0, "color": "#40e57c"}, {"name": "-", "depth": 4, "freq": 659.255, "color": "#e540c7"}, {"name": "if", "depth": 3, "freq": 880.0, "color": "#4840e5"}, {"name": "=", "depth": 4, "freq": 659.255, "color": "#e5dd40"}, {"name": "*", "depth": 3, "freq": 880.0, "color": "#9de540"}, {"name": "factorial", "depth": 4, "freq": 659.255, "color": "#40e57c"}, {"name": "-", "depth": 5, "freq": 523.251, "color": "#e540c7"}, {"name": "if", "depth": 4, "freq": 659.255, "color": "#4840e5"}, {"name": "=", "depth": 5, "freq": 523.251, "color": "#e5dd40"}, {"name": "*", "depth": 4, "freq": 659.255, "color": "#9de540"}, {"name": "factorial", "depth": 5, "freq": 523.251, "color": "#40e57c"}, {"name": "-", "depth": 6, "freq": 391.995, "color": "#e540c7"}, {"name": "if", "depth": 5, "freq": 523.251, "color": "#4840e5"}, {"name": "=", "depth": 6, "freq": 391.995, "color": "#e5dd40"}, {"name": "*", "depth": 5, "freq": 523.251, "color": "#9de540"}, {"name": "factorial", "depth": 6, "freq": 391.995, "color": "#40e57c"}, {"name": "-", "depth": 7, "freq": 261.626, "color": "#e540c7"}, {"name": "if", "depth": 6, "freq": 391.995, "color": "#4840e5"}, {"name": "=", "depth": 7, "freq": 261.626, "color": "#e5dd40"}, {"name": "*", "depth": 6, "freq": 391.995, "color": "#9de540"}, {"name": "factorial", "depth": 7, "freq": 261.626, "color": "#40e57c"}, {"name": "-", "depth": 8, "freq": 195.998, "color": "#e540c7"}, {"name": "if", "depth": 7, "freq": 261.626, "color": "#4840e5"}, {"name": "=", "depth": 8, "freq": 195.998, "color": "#e5dd40"}, {"name": "*", "depth": 7, "freq": 261.626, "color": "#9de540"}, {"name": "factorial", "depth": 8, "freq": 195.998, "color": "#40e57c"}, {"name": "-", "depth": 9, "freq": 146.832, "color": "#e540c7"}, {"name": "if", "depth": 8, "freq": 195.998, "color": "#4840e5"}, {"name": "=", "depth": 9, "freq": 146.832, "color": "#e5dd40"}, {"name": "*", "depth": 8, "freq": 195.998, "color": "#9de540"}, {"name": "factorial", "depth": 9, "freq": 146.832, "color": "#40e57c"}, {"name": "-", "depth": 10, "freq": 110.0, "color": "#e540c7"}, {"name": "if", "depth": 9, "freq": 146.832, "color": "#4840e5"}, {"name": "=", "depth": 10, "freq": 110.0, "color": "#e5dd40"}, {"name": "*", "depth": 9, "freq": 146.832, "color": "#9de540"}, {"name": "factorial", "depth": 10, "freq": 110.0, "color": "#40e57c"}, {"name": "-", "depth": 11, "freq": 82.407, "color": "#e540c7"}, {"name": "if", "depth": 10, "freq": 110.0, "color": "#4840e5"}, {"name": "=", "depth": 11, "freq": 82.407, "color": "#e5dd40"}, {"name": "*", "depth": 10, "freq": 110.0, "color": "#9de540"}, {"name": "factorial", "depth": 11, "freq": 82.407, "color": "#40e57c"}, {"name": "-", "depth": 12, "freq": 65.406, "color": "#e540c7"}, {"name": "if", "depth": 11, "freq": 82.407, "color": "#4840e5"}, {"name": "=", "depth": 12, "freq": 65.406, "color": "#e5dd40"}];
+const FIB = [{"name": "fib", "depth": 1, "freq": 1760.0, "color": "#e5409b"}, {"name": "if", "depth": 1, "freq": 1760.0, "color": "#4840e5"}, {"name": "<", "depth": 2, "freq": 1174.659, "color": "#40e5c4"}, {"name": "+", "depth": 1, "freq": 1760.0, "color": "#40e556"}, {"name": "fib", "depth": 2, "freq": 1174.659, "color": "#e5409b"}, {"name": "-", "depth": 3, "freq": 783.991, "color": "#e540c7"}, {"name": "if", "depth": 2, "freq": 1174.659, "color": "#4840e5"}, {"name": "<", "depth": 3, "freq": 783.991, "color": "#40e5c4"}, {"name": "+", "depth": 2, "freq": 1174.659, "color": "#40e556"}, {"name": "fib", "depth": 3, "freq": 783.991, "color": "#e5409b"}, {"name": "-", "depth": 4, "freq": 523.251, "color": "#e540c7"}, {"name": "if", "depth": 3, "freq": 783.991, "color": "#4840e5"}, {"name": "<", "depth": 4, "freq": 523.251, "color": "#40e5c4"}, {"name": "+", "depth": 3, "freq": 783.991, "color": "#40e556"}, {"name": "fib", "depth": 4, "freq": 523.251, "color": "#e5409b"}, {"name": "-", "depth": 5, "freq": 329.628, "color": "#e540c7"}, {"name": "if", "depth": 4, "freq": 523.251, "color": "#4840e5"}, {"name": "<", "depth": 5, "freq": 329.628, "color": "#40e5c4"}, {"name": "+", "depth": 4, "freq": 523.251, "color": "#40e556"}, {"name": "fib", "depth": 5, "freq": 329.628, "color": "#e5409b"}, {"name": "-", "depth": 6, "freq": 220.0, "color": "#e540c7"}, {"name": "if", "depth": 5, "freq": 329.628, "color": "#4840e5"}, {"name": "<", "depth": 6, "freq": 220.0, "color": "#40e5c4"}, {"name": "+", "depth": 5, "freq": 329.628, "color": "#40e556"}, {"name": "fib", "depth": 6, "freq": 220.0, "color": "#e5409b"}, {"name": "-", "depth": 7, "freq": 146.832, "color": "#e540c7"}, {"name": "if", "depth": 6, "freq": 220.0, "color": "#4840e5"}, {"name": "<", "depth": 7, "freq": 146.832, "color": "#40e5c4"}, {"name": "+", "depth": 6, "freq": 220.0, "color": "#40e556"}, {"name": "fib", "depth": 7, "freq": 146.832, "color": "#e5409b"}, {"name": "-", "depth": 8, "freq": 97.999, "color": "#e540c7"}, {"name": "if", "depth": 7, "freq": 146.832, "color": "#4840e5"}, {"name": "<", "depth": 8, "freq": 97.999, "color": "#40e5c4"}, {"name": "+", "depth": 7, "freq": 146.832, "color": "#40e556"}, {"name": "fib", "depth": 8, "freq": 97.999, "color": "#e5409b"}, {"name": "-", "depth": 9, "freq": 65.406, "color": "#e540c7"}, {"name": "if", "depth": 8, "freq": 97.999, "color": "#4840e5"}, {"name": "<", "depth": 9, "freq": 65.406, "color": "#40e5c4"}, {"name": "fib", "depth": 8, "freq": 97.999, "color": "#e5409b"}, {"name": "-", "depth": 9, "freq": 65.406, "color": "#e540c7"}, {"name": "if", "depth": 8, "freq": 97.999, "color": "#4840e5"}, {"name": "<", "depth": 9, "freq": 65.406, "color": "#40e5c4"}, {"name": "fib", "depth": 7, "freq": 146.832, "color": "#e5409b"}, {"name": "-", "depth": 8, "freq": 97.999, "color": "#e540c7"}, {"name": "if", "depth": 7, "freq": 146.832, "color": "#4840e5"}, {"name": "<", "depth": 8, "freq": 97.999, "color": "#40e5c4"}, {"name": "fib", "depth": 6, "freq": 220.0, "color": "#e5409b"}, {"name": "-", "depth": 7, "freq": 146.832, "color": "#e540c7"}, {"name": "if", "depth": 6, "freq": 220.0, "color": "#4840e5"}, {"name": "<", "depth": 7, "freq": 146.832, "color": "#40e5c4"}, {"name": "+", "depth": 6, "freq": 220.0, "color": "#40e556"}, {"name": "fib", "depth": 7, "freq": 146.832, "color": "#e5409b"}, {"name": "-", "depth": 8, "freq": 97.999, "color": "#e540c7"}, {"name": "if", "depth": 7, "freq": 146.832, "color": "#4840e5"}, {"name": "<", "depth": 8, "freq": 97.999, "color": "#40e5c4"}, {"name": "fib", "depth": 7, "freq": 146.832, "color": "#e5409b"}, {"name": "-", "depth": 8, "freq": 97.999, "color": "#e540c7"}, {"name": "if", "depth": 7, "freq": 146.832, "color": "#4840e5"}, {"name": "<", "depth": 8, "freq": 97.999, "color": "#40e5c4"}, {"name": "fib", "depth": 5, "freq": 329.628, "color": "#e5409b"}, {"name": "-", "depth": 6, "freq": 220.0, "color": "#e540c7"}, {"name": "if", "depth": 5, "freq": 329.628, "color": "#4840e5"}, {"name": "<", "depth": 6, "freq": 220.0, "color": "#40e5c4"}, {"name": "+", "depth": 5, "freq": 329.628, "color": "#40e556"}, {"name": "fib", "depth": 6, "freq": 220.0, "color": "#e5409b"}, {"name": "-", "depth": 7, "freq": 146.832, "color": "#e540c7"}, {"name": "if", "depth": 6, "freq": 220.0, "color": "#4840e5"}, {"name": "<", "depth": 7, "freq": 146.832, "color": "#40e5c4"}, {"name": "+", "depth": 6, "freq": 220.0, "color": "#40e556"}, {"name": "fib", "depth": 7, "freq": 146.832, "color": "#e5409b"}, {"name": "-", "depth": 8, "freq": 97.999, "color": "#e540c7"}, {"name": "if", "depth": 7, "freq": 146.832, "color": "#4840e5"}, {"name": "<", "depth": 8, "freq": 97.999, "color": "#40e5c4"}, {"name": "fib", "depth": 7, "freq": 146.832, "color": "#e5409b"}, {"name": "-", "depth": 8, "freq": 97.999, "color": "#e540c7"}, {"name": "if", "depth": 7, "freq": 146.832, "color": "#4840e5"}, {"name": "<", "depth": 8, "freq": 97.999, "color": "#40e5c4"}, {"name": "fib", "depth": 6, "freq": 220.0, "color": "#e5409b"}, {"name": "-", "depth": 7, "freq": 146.832, "color": "#e540c7"}, {"name": "if", "depth": 6, "freq": 220.0, "color": "#4840e5"}, {"name": "<", "depth": 7, "freq": 146.832, "color": "#40e5c4"}, {"name": "fib", "depth": 4, "freq": 523.251, "color": "#e5409b"}, {"name": "-", "depth": 5, "freq": 329.628, "color": "#e540c7"}, {"name": "if", "depth": 4, "freq": 523.251, "color": "#4840e5"}, {"name": "<", "depth": 5, "freq": 329.628, "color": "#40e5c4"}, {"name": "+", "depth": 4, "freq": 523.251, "color": "#40e556"}, {"name": "fib", "depth": 5, "freq": 329.628, "color": "#e5409b"}, {"name": "-", "depth": 6, "freq": 220.0, "color": "#e540c7"}, {"name": "if", "depth": 5, "freq": 329.628, "color": "#4840e5"}, {"name": "<", "depth": 6, "freq": 220.0, "color": "#40e5c4"}, {"name": "+", "depth": 5, "freq": 329.628, "color": "#40e556"}, {"name": "fib", "depth": 6, "freq": 220.0, "color": "#e5409b"}, {"name": "-", "depth": 7, "freq": 146.832, "color": "#e540c7"}, {"name": "if", "depth": 6, "freq": 220.0, "color": "#4840e5"}, {"name": "<", "depth": 7, "freq": 146.832, "color": "#40e5c4"}, {"name": "+", "depth": 6, "freq": 220.0, "color": "#40e556"}, {"name": "fib", "depth": 7, "freq": 146.832, "color": "#e5409b"}, {"name": "-", "depth": 8, "freq": 97.999, "color": "#e540c7"}, {"name": "if", "depth": 7, "freq": 146.832, "color": "#4840e5"}, {"name": "<", "depth": 8, "freq": 97.999, "color": "#40e5c4"}, {"name": "fib", "depth": 7, "freq": 146.832, "color": "#e5409b"}, {"name": "-", "depth": 8, "freq": 97.999, "color": "#e540c7"}, {"name": "if", "depth": 7, "freq": 146.832, "color": "#4840e5"}, {"name": "<", "depth": 8, "freq": 97.999, "color": "#40e5c4"}, {"name": "fib", "depth": 6, "freq": 220.0, "color": "#e5409b"}, {"name": "-", "depth": 7, "freq": 146.832, "color": "#e540c7"}, {"name": "if", "depth": 6, "freq": 220.0, "color": "#4840e5"}, {"name": "<", "depth": 7, "freq": 146.832, "color": "#40e5c4"}, {"name": "fib", "depth": 5, "freq": 329.628, "color": "#e5409b"}, {"name": "-", "depth": 6, "freq": 220.0, "color": "#e540c7"}, {"name": "if", "depth": 5, "freq": 329.628, "color": "#4840e5"}, {"name": "<", "depth": 6, "freq": 220.0, "color": "#40e5c4"}, {"name": "+", "depth": 5, "freq": 329.628, "color": "#40e556"}, {"name": "fib", "depth": 6, "freq": 220.0, "color": "#e5409b"}, {"name": "-", "depth": 7, "freq": 146.832, "color": "#e540c7"}, {"name": "if", "depth": 6, "freq": 220.0, "color": "#4840e5"}, {"name": "<", "depth": 7, "freq": 146.832, "color": "#40e5c4"}, {"name": "fib", "depth": 6, "freq": 220.0, "color": "#e5409b"}, {"name": "-", "depth": 7, "freq": 146.832, "color": "#e540c7"}, {"name": "if", "depth": 6, "freq": 220.0, "color": "#4840e5"}, {"name": "<", "depth": 7, "freq": 146.832, "color": "#40e5c4"}, {"name": "fib", "depth": 3, "freq": 783.991, "color": "#e5409b"}, {"name": "-", "depth": 4, "freq": 523.251, "color": "#e540c7"}, {"name": "if", "depth": 3, "freq": 783.991, "color": "#4840e5"}, {"name": "<", "depth": 4, "freq": 523.251, "color": "#40e5c4"}, {"name": "+", "depth": 3, "freq": 783.991, "color": "#40e556"}, {"name": "fib", "depth": 4, "freq": 523.251, "color": "#e5409b"}, {"name": "-", "depth": 5, "freq": 329.628, "color": "#e540c7"}, {"name": "if", "depth": 4, "freq": 523.251, "color": "#4840e5"}, {"name": "<", "depth": 5, "freq": 329.628, "color": "#40e5c4"}, {"name": "+", "depth": 4, "freq": 523.251, "color": "#40e556"}, {"name": "fib", "depth": 5, "freq": 329.628, "color": "#e5409b"}, {"name": "-", "depth": 6, "freq": 220.0, "color": "#e540c7"}, {"name": "if", "depth": 5, "freq": 329.628, "color": "#4840e5"}, {"name": "<", "depth": 6, "freq": 220.0, "color": "#40e5c4"}, {"name": "+", "depth": 5, "freq": 329.628, "color": "#40e556"}, {"name": "fib", "depth": 6, "freq": 220.0, "color": "#e5409b"}, {"name": "-", "depth": 7, "freq": 146.832, "color": "#e540c7"}, {"name": "if", "depth": 6, "freq": 220.0, "color": "#4840e5"}, {"name": "<", "depth": 7, "freq": 146.832, "color": "#40e5c4"}, {"name": "+", "depth": 6, "freq": 220.0, "color": "#40e556"}, {"name": "fib", "depth": 7, "freq": 146.832, "color": "#e5409b"}, {"name": "-", "depth": 8, "freq": 97.999, "color": "#e540c7"}, {"name": "if", "depth": 7, "freq": 146.832, "color": "#4840e5"}, {"name": "<", "depth": 8, "freq": 97.999, "color": "#40e5c4"}, {"name": "fib", "depth": 7, "freq": 146.832, "color": "#e5409b"}, {"name": "-", "depth": 8, "freq": 97.999, "color": "#e540c7"}, {"name": "if", "depth": 7, "freq": 146.832, "color": "#4840e5"}, {"name": "<", "depth": 8, "freq": 97.999, "color": "#40e5c4"}, {"name": "fib", "depth": 6, "freq": 220.0, "color": "#e5409b"}, {"name": "-", "depth": 7, "freq": 146.832, "color": "#e540c7"}, {"name": "if", "depth": 6, "freq": 220.0, "color": "#4840e5"}, {"name": "<", "depth": 7, "freq": 146.832, "color": "#40e5c4"}, {"name": "fib", "depth": 5, "freq": 329.628, "color": "#e5409b"}, {"name": "-", "depth": 6, "freq": 220.0, "color": "#e540c7"}, {"name": "if", "depth": 5, "freq": 329.628, "color": "#4840e5"}, {"name": "<", "depth": 6, "freq": 220.0, "color": "#40e5c4"}, {"name": "+", "depth": 5, "freq": 329.628, "color": "#40e556"}, {"name": "fib", "depth": 6, "freq": 220.0, "color": "#e5409b"}, {"name": "-", "depth": 7, "freq": 146.832, "color": "#e540c7"}, {"name": "if", "depth": 6, "freq": 220.0, "color": "#4840e5"}, {"name": "<", "depth": 7, "freq": 146.832, "color": "#40e5c4"}, {"name": "fib", "depth": 6, "freq": 220.0, "color": "#e5409b"}, {"name": "-", "depth": 7, "freq": 146.832, "color": "#e540c7"}, {"name": "if", "depth": 6, "freq": 220.0, "color": "#4840e5"}, {"name": "<", "depth": 7, "freq": 146.832, "color": "#40e5c4"}, {"name": "fib", "depth": 4, "freq": 523.251, "color": "#e5409b"}, {"name": "-", "depth": 5, "freq": 329.628, "color": "#e540c7"}, {"name": "if", "depth": 4, "freq": 523.251, "color": "#4840e5"}, {"name": "<", "depth": 5, "freq": 329.628, "color": "#40e5c4"}, {"name": "+", "depth": 4, "freq": 523.251, "color": "#40e556"}, {"name": "fib", "depth": 5, "freq": 329.628, "color": "#e5409b"}, {"name": "-", "depth": 6, "freq": 220.0, "color": "#e540c7"}, {"name": "if", "depth": 5, "freq": 329.628, "color": "#4840e5"}, {"name": "<", "depth": 6, "freq": 220.0, "color": "#40e5c4"}, {"name": "+", "depth": 5, "freq": 329.628, "color": "#40e556"}, {"name": "fib", "depth": 6, "freq": 220.0, "color": "#e5409b"}, {"name": "-", "depth": 7, "freq": 146.832, "color": "#e540c7"}, {"name": "if", "depth": 6, "freq": 220.0, "color": "#4840e5"}, {"name": "<", "depth": 7, "freq": 146.832, "color": "#40e5c4"}, {"name": "fib", "depth": 6, "freq": 220.0, "color": "#e5409b"}, {"name": "-", "depth": 7, "freq": 146.832, "color": "#e540c7"}, {"name": "if", "depth": 6, "freq": 220.0, "color": "#4840e5"}, {"name": "<", "depth": 7, "freq": 146.832, "color": "#40e5c4"}, {"name": "fib", "depth": 5, "freq": 329.628, "color": "#e5409b"}, {"name": "-", "depth": 6, "freq": 220.0, "color": "#e540c7"}, {"name": "if", "depth": 5, "freq": 329.628, "color": "#4840e5"}, {"name": "<", "depth": 6, "freq": 220.0, "color": "#40e5c4"}, {"name": "fib", "depth": 2, "freq": 1174.659, "color": "#e5409b"}, {"name": "-", "depth": 3, "freq": 783.991, "color": "#e540c7"}, {"name": "if", "depth": 2, "freq": 1174.659, "color": "#4840e5"}, {"name": "<", "depth": 3, "freq": 783.991, "color": "#40e5c4"}, {"name": "+", "depth": 2, "freq": 1174.659, "color": "#40e556"}, {"name": "fib", "depth": 3, "freq": 783.991, "color": "#e5409b"}, {"name": "-", "depth": 4, "freq": 523.251, "color": "#e540c7"}, {"name": "if", "depth": 3, "freq": 783.991, "color": "#4840e5"}, {"name": "<", "depth": 4, "freq": 523.251, "color": "#40e5c4"}, {"name": "+", "depth": 3, "freq": 783.991, "color": "#40e556"}, {"name": "fib", "depth": 4, "freq": 523.251, "color": "#e5409b"}, {"name": "-", "depth": 5, "freq": 329.628, "color": "#e540c7"}, {"name": "if", "depth": 4, "freq": 523.251, "color": "#4840e5"}, {"name": "<", "depth": 5, "freq": 329.628, "color": "#40e5c4"}, {"name": "+", "depth": 4, "freq": 523.251, "color": "#40e556"}, {"name": "fib", "depth": 5, "freq": 329.628, "color": "#e5409b"}, {"name": "-", "depth": 6, "freq": 220.0, "color": "#e540c7"}, {"name": "if", "depth": 5, "freq": 329.628, "color": "#4840e5"}, {"name": "<", "depth": 6, "freq": 220.0, "color": "#40e5c4"}, {"name": "+", "depth": 5, "freq": 329.628, "color": "#40e556"}, {"name": "fib", "depth": 6, "freq": 220.0, "color": "#e5409b"}, {"name": "-", "depth": 7, "freq": 146.832, "color": "#e540c7"}, {"name": "if", "depth": 6, "freq": 220.0, "color": "#4840e5"}, {"name": "<", "depth": 7, "freq": 146.832, "color": "#40e5c4"}, {"name": "+", "depth": 6, "freq": 220.0, "color": "#40e556"}, {"name": "fib", "depth": 7, "freq": 146.832, "color": "#e5409b"}, {"name": "-", "depth": 8, "freq": 97.999, "color": "#e540c7"}, {"name": "if", "depth": 7, "freq": 146.832, "color": "#4840e5"}, {"name": "<", "depth": 8, "freq": 97.999, "color": "#40e5c4"}, {"name": "fib", "depth": 7, "freq": 146.832, "color": "#e5409b"}, {"name": "-", "depth": 8, "freq": 97.999, "color": "#e540c7"}, {"name": "if", "depth": 7, "freq": 146.832, "color": "#4840e5"}, {"name": "<", "depth": 8, "freq": 97.999, "color": "#40e5c4"}, {"name": "fib", "depth": 6, "freq": 220.0, "color": "#e5409b"}, {"name": "-", "depth": 7, "freq": 146.832, "color": "#e540c7"}, {"name": "if", "depth": 6, "freq": 220.0, "color": "#4840e5"}, {"name": "<", "depth": 7, "freq": 146.832, "color": "#40e5c4"}, {"name": "fib", "depth": 5, "freq": 329.628, "color": "#e5409b"}, {"name": "-", "depth": 6, "freq": 220.0, "color": "#e540c7"}, {"name": "if", "depth": 5, "freq": 329.628, "color": "#4840e5"}, {"name": "<", "depth": 6, "freq": 220.0, "color": "#40e5c4"}, {"name": "+", "depth": 5, "freq": 329.628, "color": "#40e556"}, {"name": "fib", "depth": 6, "freq": 220.0, "color": "#e5409b"}, {"name": "-", "depth": 7, "freq": 146.832, "color": "#e540c7"}, {"name": "if", "depth": 6, "freq": 220.0, "color": "#4840e5"}, {"name": "<", "depth": 7, "freq": 146.832, "color": "#40e5c4"}, {"name": "fib", "depth": 6, "freq": 220.0, "color": "#e5409b"}, {"name": "-", "depth": 7, "freq": 146.832, "color": "#e540c7"}, {"name": "if", "depth": 6, "freq": 220.0, "color": "#4840e5"}, {"name": "<", "depth": 7, "freq": 146.832, "color": "#40e5c4"}, {"name": "fib", "depth": 4, "freq": 523.251, "color": "#e5409b"}, {"name": "-", "depth": 5, "freq": 329.628, "color": "#e540c7"}, {"name": "if", "depth": 4, "freq": 523.251, "color": "#4840e5"}, {"name": "<", "depth": 5, "freq": 329.628, "color": "#40e5c4"}, {"name": "+", "depth": 4, "freq": 523.251, "color": "#40e556"}, {"name": "fib", "depth": 5, "freq": 329.628, "color": "#e5409b"}, {"name": "-", "depth": 6, "freq": 220.0, "color": "#e540c7"}, {"name": "if", "depth": 5, "freq": 329.628, "color": "#4840e5"}, {"name": "<", "depth": 6, "freq": 220.0, "color": "#40e5c4"}, {"name": "+", "depth": 5, "freq": 329.628, "color": "#40e556"}, {"name": "fib", "depth": 6, "freq": 220.0, "color": "#e5409b"}, {"name": "-", "depth": 7, "freq": 146.832, "color": "#e540c7"}, {"name": "if", "depth": 6, "freq": 220.0, "color": "#4840e5"}, {"name": "<", "depth": 7, "freq": 146.832, "color": "#40e5c4"}, {"name": "fib", "depth": 6, "freq": 220.0, "color": "#e5409b"}, {"name": "-", "depth": 7, "freq": 146.832, "color": "#e540c7"}, {"name": "if", "depth": 6, "freq": 220.0, "color": "#4840e5"}, {"name": "<", "depth": 7, "freq": 146.832, "color": "#40e5c4"}, {"name": "fib", "depth": 5, "freq": 329.628, "color": "#e5409b"}, {"name": "-", "depth": 6, "freq": 220.0, "color": "#e540c7"}, {"name": "if", "depth": 5, "freq": 329.628, "color": "#4840e5"}, {"name": "<", "depth": 6, "freq": 220.0, "color": "#40e5c4"}, {"name": "fib", "depth": 3, "freq": 783.991, "color": "#e5409b"}, {"name": "-", "depth": 4, "freq": 523.251, "color": "#e540c7"}, {"name": "if", "depth": 3, "freq": 783.991, "color": "#4840e5"}, {"name": "<", "depth": 4, "freq": 523.251, "color": "#40e5c4"}, {"name": "+", "depth": 3, "freq": 783.991, "color": "#40e556"}, {"name": "fib", "depth": 4, "freq": 523.251, "color": "#e5409b"}, {"name": "-", "depth": 5, "freq": 329.628, "color": "#e540c7"}, {"name": "if", "depth": 4, "freq": 523.251, "color": "#4840e5"}, {"name": "<", "depth": 5, "freq": 329.628, "color": "#40e5c4"}, {"name": "+", "depth": 4, "freq": 523.251, "color": "#40e556"}, {"name": "fib", "depth": 5, "freq": 329.628, "color": "#e5409b"}, {"name": "-", "depth": 6, "freq": 220.0, "color": "#e540c7"}, {"name": "if", "depth": 5, "freq": 329.628, "color": "#4840e5"}, {"name": "<", "depth": 6, "freq": 220.0, "color": "#40e5c4"}, {"name": "+", "depth": 5, "freq": 329.628, "color": "#40e556"}, {"name": "fib", "depth": 6, "freq": 220.0, "color": "#e5409b"}, {"name": "-", "depth": 7, "freq": 146.832, "color": "#e540c7"}, {"name": "if", "depth": 6, "freq": 220.0, "color": "#4840e5"}, {"name": "<", "depth": 7, "freq": 146.832, "color": "#40e5c4"}, {"name": "fib", "depth": 6, "freq": 220.0, "color": "#e5409b"}, {"name": "-", "depth": 7, "freq": 146.832, "color": "#e540c7"}, {"name": "if", "depth": 6, "freq": 220.0, "color": "#4840e5"}, {"name": "<", "depth": 7, "freq": 146.832, "color": "#40e5c4"}, {"name": "fib", "depth": 5, "freq": 329.628, "color": "#e5409b"}, {"name": "-", "depth": 6, "freq": 220.0, "color": "#e540c7"}, {"name": "if", "depth": 5, "freq": 329.628, "color": "#4840e5"}, {"name": "<", "depth": 6, "freq": 220.0, "color": "#40e5c4"}, {"name": "fib", "depth": 4, "freq": 523.251, "color": "#e5409b"}, {"name": "-", "depth": 5, "freq": 329.628, "color": "#e540c7"}, {"name": "if", "depth": 4, "freq": 523.251, "color": "#4840e5"}, {"name": "<", "depth": 5, "freq": 329.628, "color": "#40e5c4"}, {"name": "+", "depth": 4, "freq": 523.251, "color": "#40e556"}, {"name": "fib", "depth": 5, "freq": 329.628, "color": "#e5409b"}, {"name": "-", "depth": 6, "freq": 220.0, "color": "#e540c7"}, {"name": "if", "depth": 5, "freq": 329.628, "color": "#4840e5"}, {"name": "<", "depth": 6, "freq": 220.0, "color": "#40e5c4"}, {"name": "fib", "depth": 5, "freq": 329.628, "color": "#e5409b"}, {"name": "-", "depth": 6, "freq": 220.0, "color": "#e540c7"}, {"name": "if", "depth": 5, "freq": 329.628, "color": "#4840e5"}, {"name": "<", "depth": 6, "freq": 220.0, "color": "#40e5c4"}];
+const FAC_MAX = 12;
+const FIB_MAX = 9;
+
+// ── 畫靜態地形 ───────────────────────────────────────────────────
+function drawTerrain(canvasId, notes, maxD, headIdx) {
+  const cv  = document.getElementById(canvasId);
+  const ctx = cv.getContext('2d');
+  const W = cv.width, H = cv.height;
+  const PAD_L = 8, PAD_R = 8, PAD_T = 10, PAD_B = 20;
+  const plotW = W - PAD_L - PAD_R;
+  const plotH = H - PAD_T - PAD_B;
+  const n = notes.length;
+
+  ctx.fillStyle = '#050510';
+  ctx.fillRect(0, 0, W, H);
+
+  // 深度格線
+  for (let d = 1; d <= maxD; d++) {
+    const y = PAD_T + plotH - (d / maxD) * plotH;
+    ctx.strokeStyle = d % 5 === 0 ? '#0f0f20' : '#090914';
+    ctx.lineWidth = 0.5;
+    ctx.beginPath(); ctx.moveTo(PAD_L, y); ctx.lineTo(W - PAD_R, y); ctx.stroke();
+    if (d % 5 === 0) {
+      ctx.fillStyle = '#1a1a28';
+      ctx.font = '8px monospace';
+      ctx.textAlign = 'left';
+      ctx.fillText(d, 2, y + 3);
+    }
+  }
+
+  // 地形填充（每個音符一段）
+  const colW = plotW / n;
+  notes.forEach((note, i) => {
+    const x   = PAD_L + i * colW;
+    const h   = (note.depth / maxD) * plotH;
+    const y   = PAD_T + plotH - h;
+    const dim = headIdx < 0 ? 1.0 :
+                (i < headIdx ? 0.18 : (i === headIdx ? 1.0 : 0.42));
+    ctx.globalAlpha = dim;
+    ctx.fillStyle = note.color;
+    ctx.fillRect(x, y, Math.max(colW, 0.8), h);
+  });
+
+  ctx.globalAlpha = 1;
+
+  // 地形輪廓線
+  ctx.beginPath();
+  ctx.strokeStyle = 'rgba(160,180,220,0.12)';
+  ctx.lineWidth = 1;
+  notes.forEach((note, i) => {
+    const x = PAD_L + (i + 0.5) * colW;
+    const y = PAD_T + plotH - (note.depth / maxD) * plotH;
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+
+  // 播放頭
+  if (headIdx >= 0) {
+    const px = PAD_L + (headIdx + 0.5) * colW;
+    ctx.strokeStyle = 'rgba(180,210,255,0.55)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(px, PAD_T); ctx.lineTo(px, H - PAD_B); ctx.stroke();
+
+    // 當前音符的光暈
+    const cur = notes[headIdx];
+    const cy  = PAD_T + plotH - (cur.depth / maxD) * plotH;
+    ctx.shadowColor = cur.color;
+    ctx.shadowBlur  = 18;
+    ctx.fillStyle   = cur.color;
+    ctx.beginPath();
+    ctx.arc(px, cy, 3.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+
+  // X 軸
+  ctx.fillStyle = '#0d0d1a';
+  ctx.fillRect(PAD_L, PAD_T + plotH, plotW, 1);
+}
+
+// ── 音訊 ────────────────────────────────────────────────────────
+let ac = null;
+function getAC() {
+  if (!ac) ac = new (window.AudioContext || window.webkitAudioContext)();
+  return ac;
+}
+
+function playNote(freq, when, dur, color) {
+  const ctx  = getAC();
+  const osc  = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = 'triangle';
+  osc.frequency.value = freq;
+  gain.gain.setValueAtTime(0.18, when);
+  gain.gain.setValueAtTime(0.18, when + dur * 0.6);
+  gain.gain.linearRampToValueAtTime(0.0001, when + dur);
+  osc.connect(gain); gain.connect(ctx.destination);
+  osc.start(when); osc.stop(when + dur + 0.02);
+}
+
+// ── 播放 ────────────────────────────────────────────────────────
+let playing = false, raf = null, wallStart = 0;
+const MAX_NOTES = Math.max(FAC.length, FIB.length);
+
+function togglePlay() {
+  if (playing) stopPlay(); else startPlay();
+}
+
+async function startPlay() {
+  const ctx = getAC();
+  if (ctx.state === 'suspended') await ctx.resume();
+
+  const ms  = parseInt(document.getElementById('spd').value);
+  const sec = ms / 1000;
+  const now = ctx.currentTime + 0.12;
+
+  // 排程音符（兩軌，不同時長）
+  FAC.forEach((n, i) => { playNote(n.freq, now + i * sec, sec * 1.4, n.color); });
+  FIB.forEach((n, i) => {
+    const t = now + (i / FIB.length) * (FAC.length * sec);
+    playNote(n.freq * 0.5, t, (FAC.length * sec / FIB.length) * 1.3, n.color);
+  });
+
+  playing   = true;
+  wallStart = performance.now();
+  document.getElementById('btn').textContent = '■ 停止';
+  document.getElementById('btn').classList.add('playing');
+
+  function animate() {
+    if (!playing) return;
+    const elapsed = performance.now() - wallStart;
+    const total   = FAC.length * ms;
+
+    const facIdx = Math.min(Math.floor(elapsed / ms), FAC.length - 1);
+    const fibIdx = Math.min(Math.floor((elapsed / total) * FIB.length), FIB.length - 1);
+
+    drawTerrain('fac-cv', FAC, FAC_MAX, facIdx);
+    drawTerrain('fib-cv', FIB, FIB_MAX, fibIdx);
+    updateStatus(facIdx, fibIdx);
+
+    if (elapsed < total) {
+      raf = requestAnimationFrame(animate);
+    } else {
+      stopPlay(true);
+    }
+  }
+  raf = requestAnimationFrame(animate);
+}
+
+function stopPlay(fin) {
+  playing = false;
+  if (raf) cancelAnimationFrame(raf);
+  document.getElementById('btn').textContent = '▶ 播放';
+  document.getElementById('btn').classList.remove('playing');
+
+  // 播完後保持最後狀態
+  if (!fin) {
+    drawTerrain('fac-cv', FAC, FAC_MAX, -1);
+    drawTerrain('fib-cv', FIB, FIB_MAX, -1);
+    ['fac-fn','fib-fn','fac-d','fib-d'].forEach(id => {
+      document.getElementById(id).textContent = id.endsWith('-fn') ? '—' : '';
+      document.getElementById(id).style.color = '';
+      document.getElementById(id).style.textShadow = '';
+    });
+    document.getElementById('fac-bar').style.width = '0%';
+    document.getElementById('fib-bar').style.width = '0%';
+  }
+}
+
+function updateStatus(facIdx, fibIdx) {
+  const fn = FAC[facIdx], fi = FIB[fibIdx];
+
+  document.getElementById('fac-fn').textContent = fn.name;
+  document.getElementById('fac-fn').style.color = fn.color;
+  document.getElementById('fac-fn').style.textShadow = `0 0 16px ${fn.color}66`;
+  document.getElementById('fac-d').textContent = `depth ${fn.depth}`;
+  document.getElementById('fac-d').style.color = fn.color + '99';
+
+  document.getElementById('fib-fn').textContent = fi.name;
+  document.getElementById('fib-fn').style.color = fi.color;
+  document.getElementById('fib-fn').style.textShadow = `0 0 16px ${fi.color}66`;
+  document.getElementById('fib-d').textContent = `depth ${fi.depth}`;
+  document.getElementById('fib-d').style.color = fi.color + '99';
+
+  document.getElementById('fac-bar').style.width = `${(fn.depth / FAC_MAX) * 100}%`;
+  document.getElementById('fac-bar').style.background = fn.color;
+  document.getElementById('fib-bar').style.width = `${(fi.depth / FIB_MAX) * 100}%`;
+  document.getElementById('fib-bar').style.background = fi.color;
+}
+
+// 初始靜態畫面
+drawTerrain('fac-cv', FAC, FAC_MAX, -1);
+drawTerrain('fib-cv', FIB, FIB_MAX, -1);
+</script>
+</body>
+</html>

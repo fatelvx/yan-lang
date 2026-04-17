@@ -1,0 +1,126 @@
+; 惰性串流 (Lazy Streams)
+;
+; 串流是無限長的序列，但只在需要時計算。
+; 用閉包實作：每個串流是一個 (head . thunk) 對，
+; thunk 在被呼叫時才產生下一個元素。
+;
+; 這讓我們可以處理「無限」的東西。
+
+; ── Stream 原語 ────────────────────────────────────────
+;
+; 串流以二元素串列 (head thunk) 表示。
+; stream-cdr 用 list-ref 取得 index=1 的 thunk 再呼叫它，
+; 避免 cdr 回傳切片而非物件的問題。
+
+(define-macro (stream-cons head tail)
+  `(list ,head (lambda () ,tail)))
+
+(define stream-null '())
+(define stream-null? null?)
+
+(define (stream-car s) (list-ref s 0))
+(define (stream-cdr s) ((list-ref s 1)))   ; force the thunk
+
+(define (stream-take s n)
+  (if (or (= n 0) (stream-null? s))
+      '()
+      (cons (stream-car s)
+            (stream-take (stream-cdr s) (- n 1)))))
+
+(define (stream-drop s n)
+  (if (or (= n 0) (stream-null? s))
+      s
+      (stream-drop (stream-cdr s) (- n 1))))
+
+(define (stream-ref s n)
+  (if (= n 0)
+      (stream-car s)
+      (stream-ref (stream-cdr s) (- n 1))))
+
+(define (stream-map f s)
+  (if (stream-null? s)
+      stream-null
+      (stream-cons (f (stream-car s))
+                   (stream-map f (stream-cdr s)))))
+
+(define (stream-filter pred s)
+  (cond ((stream-null? s) stream-null)
+        ((pred (stream-car s))
+         (stream-cons (stream-car s)
+                      (stream-filter pred (stream-cdr s))))
+        (else (stream-filter pred (stream-cdr s)))))
+
+(define (stream-zip-with f s1 s2)
+  (if (or (stream-null? s1) (stream-null? s2))
+      stream-null
+      (stream-cons (f (stream-car s1) (stream-car s2))
+                   (stream-zip-with f (stream-cdr s1) (stream-cdr s2)))))
+
+
+; ── 無限整數串流 ─────────────────────────────────────────
+
+(define (integers-from n)
+  (stream-cons n (integers-from (+ n 1))))
+
+(define naturals (integers-from 0))
+(define positives (integers-from 1))
+
+(display "前十個自然數：")
+(print (stream-take naturals 10))
+
+
+; ── 無限 Fibonacci 串流 ────────────────────────────────
+
+(define fibs
+  (let loop ((a 0) (b 1))
+    (stream-cons a (loop b (+ a b)))))
+
+(display "前十五個 Fibonacci：")
+(print (stream-take fibs 15))
+
+; 第 30 個 Fibonacci
+(display "第 30 個 Fibonacci：")
+(print (stream-ref fibs 30))
+
+
+; ── 質數篩（Sieve of Eratosthenes）────────────────────
+;
+; 這是串流最美的應用之一：
+; 用一個過濾器層疊起來篩出質數。
+
+(define (sieve s)
+  (let ((p (stream-car s)))
+    (stream-cons p
+      (sieve (stream-filter
+               (lambda (n) (not (= (modulo n p) 0)))
+               (stream-cdr s))))))
+
+(define primes (sieve (integers-from 2)))
+
+(display "前二十個質數：")
+(print (stream-take primes 20))
+
+(display "第 100 個質數：")
+(print (stream-ref primes 99))
+
+
+; ── 無限冪次串流 ────────────────────────────────────────
+
+(define (powers-of n)
+  (let loop ((x 1))
+    (stream-cons x (loop (* x n)))))
+
+(display "2 的次方（前 12 個）：")
+(print (stream-take (powers-of 2) 12))
+
+
+; ── 兩個串流相加 ────────────────────────────────────────
+
+(define ones (stream-cons 1 ones))   ; 全是 1 的無限串流
+
+(define integers
+  (stream-zip-with + ones
+    (stream-cons 0 integers)))       ; 自引用定義！
+
+(display "整數串流（前十個）：")
+(print (stream-take integers 10))

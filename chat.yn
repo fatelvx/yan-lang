@@ -1,0 +1,120 @@
+; chat.yn — 和言說話
+;
+; 一個對話界面，底層是言。
+; 你說的每一件事都記在 journal.yn 裡。
+;
+; 啟動：python -X utf8 yan/yan.py chat.yn
+
+(load "greet.yn")   ; 載入 greet/remember/reflect，也載入了 list.yn 和 strings.yn
+
+; ── 狀態 ─────────────────────────────────────────────────────
+
+(define *name* #f)
+
+; ── 辨識輸入意圖 ──────────────────────────────────────────────
+
+(define (yan-code? s)
+  (string-starts-with? (string-trim s) "("))
+
+(define (greeting? s)
+  (or (string-contains s "你好")
+      (string-contains s "hello")
+      (string-contains s "hi")
+      (string-contains s "嗨")))
+
+(define (wants-reflect? s)
+  (or (string-contains s "你覺得我")
+      (string-contains s "你了解我嗎")
+      (string-contains s "你知道我")
+      (string-contains s "reflect")))
+
+(define (wants-recall? s)
+  (or (string-contains s "你記得")
+      (string-contains s "上次")
+      (string-contains s "recall")))
+
+(define (farewell? s)
+  (or (string-contains s "掰掰")
+      (string-contains s "拜拜")
+      (string-contains s "bye")
+      (string-contains s "再見")
+      (equal? (string-trim s) "exit")))
+
+; ── 回應 ─────────────────────────────────────────────────────
+
+(define (respond input)
+  (cond
+    ; 告訴言你的名字
+    ((and (not *name*) (string-starts-with? input "我叫"))
+     (let ((name (string-trim (substring input 2 (string-length input)))))
+       (set! *name* name)
+       (greet name)
+       #t))
+
+    ; 還沒有名字，先問
+    ((not *name*)
+     (display "你叫什麼名字？")
+     (newline)
+     #t)
+
+    ; 離開
+    ((farewell? input)
+     (display (format "再見，~a。" *name*))
+     (newline)
+     #f)
+
+    ; 執行言程式碼
+    ((yan-code? input)
+     (let ((result (eval-string input)))
+       (when (not (equal? result (if #f #f)))
+         (display "→ ") (print result)))
+     #t)
+
+    ; 問言對自己的觀察
+    ((wants-reflect? input)
+     (reflect *name*)
+     #t)
+
+    ; 問上次說了什麼
+    ((wants-recall? input)
+     (let ((last (recall *name*)))
+       (if (null? last)
+           (begin (display "我沒有你的記錄。") (newline))
+           (let ((text (car last))
+                 (conf (cadr last))
+                 (pinned (caddr last)))
+             (display (format "你上次說：「~a」" text))
+             (when pinned (display " 📌"))
+             (display (format "（信心 ~a）" (round (* conf 100))))
+             (newline))))
+     #t)
+
+    ; 問候
+    ((greeting? input)
+     (greet *name*)
+     #t)
+
+    ; 其他：記下來，簡單回應
+    (else
+     (remember *name* input)
+     (display "嗯。")
+     (newline)
+     #t)))
+
+; ── 主循環 ────────────────────────────────────────────────────
+
+(display "\n言的對話界面\n")
+(display "──────────────────────────────────\n")
+(display "說「我叫XXX」開始。說「再見」離開。\n")
+(display "( 開頭的輸入直接當言程式碼執行。\n\n")
+
+(let loop ()
+  (display "\n你  ")
+  (let ((input (read-line)))
+    (when (and input (not (string-empty? input)))
+      (display "\n")
+      (let ((cont (respond input)))
+        (when cont (loop))))))
+
+; 結束時回傳空值，避免 REPL 印出奇怪的東西
+(if #f #f)

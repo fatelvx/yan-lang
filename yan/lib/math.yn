@@ -1,0 +1,59 @@
+; yan/lib/math.yn — 數學工具庫
+;
+; 用法：(load "yan/lib/math.yn")
+
+; ── 基本 ──────────────────────────────────────────────────────
+
+(define (square x) (* x x))
+(define (cube   x) (* x x x))
+
+(define (average lst)
+  (/ (fold-left + 0 lst) (length lst)))
+
+(define (clamp x lo hi)
+  (max lo (min hi x)))
+
+(define (between? x lo hi)
+  (and (>= x lo) (<= x hi)))
+
+; ── 數論 ──────────────────────────────────────────────────────
+
+(define (gcd a b)
+  (if (= b 0) a (gcd b (modulo a b))))
+
+(define (lcm a b)
+  (/ (* a b) (gcd a b)))
+
+(define (prime? n)
+  (if (< n 2) #f
+      (let loop ((i 2))
+        (cond
+          ((> (* i i) n) #t)
+          ((= (modulo n i) 0) #f)
+          (else (loop (+ i 1)))))))
+
+(define (factors n)
+  (let loop ((i 2) (m n) (acc '()))
+    (cond
+      ((> (* i i) m)
+       (reverse (if (> m 1) (cons m acc) acc)))
+      ((= (modulo m i) 0)
+       (loop i (/ m i) (cons i acc)))
+      (else (loop (+ i 1) m acc)))))
+
+(define (fibonacci n)
+  (let loop ((a 0) (b 1) (k n))
+    (if (= k 0) a
+        (loop b (+ a b) (- k 1)))))
+
+; ── 統計 ──────────────────────────────────────────────────────
+; 需要 yan/lib/list.yn 的 sum、product
+
+(define (mean lst)
+  (if (null? lst) 0
+      (/ (sum lst) (length lst))))
+
+(define (variance lst)
+  (if (null? lst) 0
+      (let ((m (mean lst)))
+        (mean (map (lambda (x) (square (- x m))) lst)))))

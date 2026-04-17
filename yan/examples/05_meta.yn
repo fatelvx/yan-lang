@@ -1,0 +1,377 @@
+; 05_meta.yn — 言說自己
+;
+; 用言（Yán）寫一個能執行言的直譯器。
+;
+; 核心只有兩個函式：
+;   yn-eval  — 把表達式求值成結果
+;   yn-apply — 把函式套用到引數
+;
+; 它們互相呼叫。這就是全部。
+; 計算的自指：一個語言理解自己。
+
+
+; ══════════════════════════════════════════════════════════════
+; 環境操作
+;
+; 環境是一個平坦的關聯列表：((sym val) (sym val) ...)
+; 查找：從前往後掃，找到就返回
+; 擴展：新綁定加在前面（新的覆蓋舊的）
+; ══════════════════════════════════════════════════════════════
+
+(define (env-lookup sym env)
+  (if (null? env)
+      (error (string-append "未定義的名稱：" (symbol->string sym)))
+      (let ((b (assoc sym env)))
+        (if b (cadr b)
+            (error (string-append "未定義的名稱：" (symbol->string sym)))))))
+
+(define (env-extend env params args)
+  (append (map list params args) env))
+
+
+; ══════════════════════════════════════════════════════════════
+; 型別謂詞
+; ══════════════════════════════════════════════════════════════
+
+(define (self-evaluating? x)
+  (or (number? x) (string? x) (boolean? x) (null? x)))
+
+(define (yn-primitive? x) (and (pair? x) (equal? (car x) 'primitive)))
+(define (yn-closure?   x) (and (pair? x) (equal? (car x) 'closure)))
+
+
+; ══════════════════════════════════════════════════════════════
+; yn-eval — 求值器
+;
+; 對每一種形式各有處理：
+;   自求值原子 → 原樣返回
+;   符號       → 在環境中查找
+;   特殊形式   → 直接處理
+;   函式應用   → 求值運算子和引數，呼叫 yn-apply
+; ══════════════════════════════════════════════════════════════
+
+(define (yn-eval expr env)
+  (cond
+
+    ; ── 自求值原子 ──────────────────────────────────────────
+    ((self-evaluating? expr)
+     expr)
+
+    ; ── 符號查找 ────────────────────────────────────────────
+    ((symbol? expr)
+     (env-lookup expr env))
+
+    ; ── (quote x) ──────────────────────────────────────────
+    ((and (pair? expr) (equal? (car expr) 'quote))
+     (cadr expr))
+
+    ; ── (if cond then else?) ────────────────────────────────
+    ((and (pair? expr) (equal? (car expr) 'if))
+     (if (yn-eval (cadr expr) env)
+         (yn-eval (caddr expr) env)
+         (if (pair? (cdr (cdr (cdr expr))))
+             (yn-eval (cadddr expr) env)
+             #f)))
+
+    ; ── (lambda (params) body...) ──────────────────────────
+    ; 多表達式 body 自動包進 begin；閉包捕捉當前環境快照
+    ((and (pair? expr) (equal? (car expr) 'lambda))
+     (let* ((rest (cdr (cdr expr)))
+            (body (if (null? (cdr rest)) (car rest) (cons 'begin rest))))
+       (list 'closure (cadr expr) body env)))
+
+    ; ── (define ...) ───────────────────────────────────────
+    ; 定義的閉包使用 'global 標記，呼叫時才綁定到 meta-global
+    ; （讓遞迴函式能看到自己）
+    ((and (pair? expr) (equal? (car expr) 'define))
+     (if (pair? (cadr expr))
+         ; (define (f x) body...) 簡寫，支援多 body
+         (let* ((rest (cdr (cdr expr)))
+                (body (if (null? (cdr rest)) (car rest) (cons 'begin rest))))
+           (env-define! (car (cadr expr))
+                        (list 'closure (cdr (cadr expr)) body 'global)))
+         ; (define sym val)
+         (env-define! (cadr expr)
+                      (yn-eval (caddr expr) env))))
+
+    ; ── (begin e1 e2 ...) ──────────────────────────────────
+    ((and (pair? expr) (equal? (car expr) 'begin))
+     (yn-eval-seq (cdr expr) env))
+
+    ; ── (let name ((x v) ...) body) — named let ───────────
+    ((and (pair? expr) (equal? (car expr) 'let)
+          (symbol? (cadr expr)))
+     (let* ((name     (cadr expr))
+            (bindings (caddr expr))
+            (body     (cadddr expr))
+            (params   (map car bindings))
+            (vals     (map (lambda (b) (yn-eval (cadr b) env)) bindings))
+            (fn       (list 'closure params body 'global)))
+       (env-define! name fn)
+       (yn-apply fn vals)))
+
+    ; ── (let ((x v) ...) body) — 普通 let ─────────────────
+    ((and (pair? expr) (equal? (car expr) 'let))
+     (let* ((bindings (cadr expr))
+            (body     (caddr expr))
+            (params   (map car bindings))
+            (vals     (map (lambda (b) (yn-eval (cadr b) env)) bindings)))
+       (yn-eval body (env-extend env params vals))))
+
+    ; ── (and e1 e2 ...) ────────────────────────────────────
+    ((and (pair? expr) (equal? (car expr) 'and))
+     (yn-eval-and (cdr expr) env))
+
+    ; ── (or e1 e2 ...) ─────────────────────────────────────
+    ((and (pair? expr) (equal? (car expr) 'or))
+     (yn-eval-or (cdr expr) env))
+
+    ; ── (cond (test expr) ...) ─────────────────────────────
+    ((and (pair? expr) (equal? (car expr) 'cond))
+     (yn-eval-cond (cdr expr) env))
+
+    ; ── 函式應用 ────────────────────────────────────────────
+    ((pair? expr)
+     (let ((proc (yn-eval (car expr) env))
+           (args (map (lambda (a) (yn-eval a env)) (cdr expr))))
+       (yn-apply proc args)))
+
+    (else (error "無法求值"))))
+
+
+(define (yn-eval-seq exprs env)
+  (if (null? (cdr exprs))
+      (yn-eval (car exprs) env)
+      (begin
+        (yn-eval (car exprs) env)
+        (yn-eval-seq (cdr exprs) env))))
+
+(define (yn-eval-and exprs env)
+  (cond
+    ((null? exprs) #t)
+    ((null? (cdr exprs)) (yn-eval (car exprs) env))
+    ((yn-eval (car exprs) env) (yn-eval-and (cdr exprs) env))
+    (else #f)))
+
+(define (yn-eval-or exprs env)
+  (if (null? exprs) #f
+      (let ((v (yn-eval (car exprs) env)))
+        (if v v (yn-eval-or (cdr exprs) env)))))
+
+(define (yn-eval-cond clauses env)
+  (cond
+    ((null? clauses) #f)
+    ((equal? (car (car clauses)) 'else)
+     (yn-eval (cadr (car clauses)) env))
+    ((yn-eval (car (car clauses)) env)
+     (yn-eval (cadr (car clauses)) env))
+    (else (yn-eval-cond (cdr clauses) env))))
+
+
+; ══════════════════════════════════════════════════════════════
+; yn-apply — 函式應用
+;
+; 兩種情況：
+;   primitive — 直接呼叫底層函式
+;   closure   — 擴展捕捉的環境，求值主體
+; ══════════════════════════════════════════════════════════════
+
+(define (yn-apply proc args)
+  (cond
+    ((yn-primitive? proc)
+     (apply (cadr proc) args))
+    ((yn-closure? proc)
+     (let* ((params  (cadr proc))
+            (body    (caddr proc))
+            (clo-env (cadddr proc))
+            ; 'global 標記：呼叫時使用當前 meta-global（支援遞迴）
+            (base    (if (equal? clo-env 'global) meta-global clo-env))
+            (new-env (env-extend base params args)))
+       (yn-eval body new-env)))
+    (else (error "不是可呼叫的值"))))
+
+
+; ══════════════════════════════════════════════════════════════
+; 初始環境與全域狀態
+; ══════════════════════════════════════════════════════════════
+
+(define meta-global '())
+
+(define (env-define! sym val)
+  (set! meta-global (cons (list sym val) meta-global)))
+
+; 把 Yán 的基本函式包裝成 primitive
+(for-each
+  (lambda (pair)
+    (env-define! (car pair) (list 'primitive (cadr pair))))
+  (list
+    (list '+ +)   (list '- -)   (list '* *)   (list '/ /)
+    (list '= =)   (list '< <)   (list '> >)   (list '<= <=) (list '>= >=)
+    (list 'not not)
+    (list 'cons cons) (list 'car car)   (list 'cdr cdr)
+    (list 'list list) (list 'null? null?) (list 'pair? pair?)
+    (list 'eq? eq?) (list 'equal? equal?)
+    (list 'number? number?) (list 'symbol? symbol?) (list 'boolean? boolean?)
+    (list 'display display) (list 'newline newline) (list 'print print)
+    ; 算術擴充
+    (list '** expt)  (list 'expt expt)
+    (list 'sqrt sqrt) (list 'abs abs)
+    (list 'floor floor) (list 'ceil ceil) (list 'round round)
+    (list 'modulo modulo) (list 'remainder remainder)
+    (list 'max max) (list 'min min)
+    ; 型別謂詞
+    (list 'odd? odd?)  (list 'even? even?)
+    (list 'string? string?) (list 'procedure? procedure?)
+    ; 串列擴充
+    (list 'map map) (list 'filter filter)
+    (list 'fold-left fold-left)
+    (list 'append append) (list 'length length) (list 'reverse reverse)
+    (list 'member member) (list 'assoc assoc)
+    (list 'for-each for-each)
+    ; 字串
+    (list 'string-append string-append) (list 'symbol->string symbol->string)
+    (list 'number->string number->string) (list 'string->number string->number)
+    (list 'string-length string-length) (list 'substring substring)
+    ; I/O
+    (list 'display display) (list 'newline newline) (list 'print print)
+    (list 'format format)))
+
+; 常數
+(env-define! 'pi pi)
+(env-define! 'true #t)
+(env-define! 'false #f)
+
+; 在元層定義 PRELUDE 常用函式（用言自己寫，使元直譯器自給自足）
+(define (yn-run expr)
+  (yn-eval expr meta-global))
+
+(yn-run '(define (square x) (* x x)))
+(yn-run '(define (cube   x) (* x x x)))
+(yn-run '(define (inc x) (+ x 1)))
+(yn-run '(define (dec x) (- x 1)))
+(yn-run '(define (zero? x) (= x 0)))
+(yn-run '(define (positive? x) (> x 0)))
+(yn-run '(define (negative? x) (< x 0)))
+
+(yn-run '(define (factorial n)
+           (if (= n 0) 1 (* n (factorial (- n 1))))))
+
+(yn-run '(define (fibonacci n)
+           (let loop ((a 0) (b 1) (k n))
+             (if (= k 0) a (loop b (+ a b) (- k 1))))))
+
+(yn-run '(define (compose f g)
+           (lambda (x) (f (g x)))))
+
+(yn-run '(define (curry f)
+           (lambda (x) (lambda (y) (f x y)))))
+
+; 高階函式必須在元層定義，才能透過 yn-apply 呼叫元閉包
+(yn-run '(define (my-map f lst)
+           (if (null? lst) '()
+               (cons (f (car lst)) (my-map f (cdr lst))))))
+
+(yn-run '(define (my-filter pred lst)
+           (cond
+             ((null? lst) '())
+             ((pred (car lst)) (cons (car lst) (my-filter pred (cdr lst))))
+             (else (my-filter pred (cdr lst))))))
+
+(yn-run '(define (my-fold-left f init lst)
+           (if (null? lst) init
+               (my-fold-left f (f init (car lst)) (cdr lst)))))
+
+
+; ══════════════════════════════════════════════════════════════
+; 測試
+; ══════════════════════════════════════════════════════════════
+
+(display "\n言說自己 — 元直譯器\n")
+(display "══════════════════════\n\n")
+
+; 1. 算術
+(display "算術          ")
+(print (yn-run '(+ 1 (* 2 3) (- 10 5))))   ; 12
+
+; 2. 條件
+(display "條件          ")
+(print (yn-run '(if (> 3 2) "對" "錯")))    ; 對
+
+; 3. 閉包
+(yn-run '(define (square x) (* x x)))
+(display "平方          ")
+(print (yn-run '(square 7)))                ; 49
+
+; 4. 遞迴
+(yn-run '(define (factorial n)
+           (if (= n 0) 1 (* n (factorial (- n 1))))))
+(display "10!           ")
+(print (yn-run '(factorial 10)))            ; 3628800
+
+; 5. 高階函式
+(yn-run '(define (my-map f lst)
+           (if (null? lst) '()
+               (cons (f (car lst))
+                     (my-map f (cdr lst))))))
+(display "映射平方      ")
+(print (yn-run '(my-map (lambda (x) (* x x)) '(1 2 3 4 5))))
+                                            ; (1 4 9 16 25)
+
+; 6. 閉包捕捉
+(yn-run '(define (make-adder n) (lambda (x) (+ n x))))
+(yn-run '(define add10 (make-adder 10)))
+(display "閉包 add10    ")
+(print (yn-run '(add10 32)))                ; 42
+
+; 7. let
+(display "let           ")
+(print (yn-run '(let ((x 3) (y 4))
+                  (+ (* x x) (* y y)))))    ; 25（3²+4²）
+
+; 8. 互遞迴
+(yn-run '(define (my-even? n) (if (= n 0) #t (my-odd?  (- n 1)))))
+(yn-run '(define (my-odd?  n) (if (= n 0) #f (my-even? (- n 1)))))
+(display "偶數？10      ")
+(print (yn-run '(my-even? 10)))             ; #t
+(display "偶數？7       ")
+(print (yn-run '(my-even? 7)))              ; #f
+
+
+; ══════════════════════════════════════════════════════════════
+; 第三層：元直譯器執行元直譯器
+;
+; 把 yn-eval 和 yn-apply 加進 meta-global，
+; 讓元直譯器本身可以在元層被呼叫。
+; ══════════════════════════════════════════════════════════════
+
+(display "\n第三層\n")
+(display "══════════════════════\n\n")
+
+(env-define! 'yn-eval  (list 'primitive yn-eval))
+(env-define! 'yn-apply (list 'primitive yn-apply))
+
+; 最小環境供第三層使用
+(define tiny-env
+  (list (list '+ (list 'primitive +))
+        (list '* (list 'primitive *))
+        (list '- (list 'primitive -))
+        (list 'if 'if)))   ; 不需要，if 是特殊形式，留著提示
+
+(env-define! 'tiny-env tiny-env)
+
+; 第三層算術
+(display "第三層 (+ 40 2)         ")
+(print (yn-run '(yn-eval '(+ 40 2) tiny-env)))
+                                            ; 42
+
+; 第三層 lambda
+(display "第三層 lambda           ")
+(print (yn-run '(yn-eval '((lambda (x) (* x x)) 9) tiny-env)))
+                                            ; 81
+
+; 第三層 let
+(display "第三層 let              ")
+(print (yn-run '(yn-eval '(let ((a 3) (b 4)) (+ (* a a) (* b b))) tiny-env)))
+                                            ; 25
+
+(display "\n語言在說自己。\n")

@@ -1,0 +1,133 @@
+; 14_analyze.yn — 言分析自己
+;
+; 用標準庫處理 journal.yn 的真實資料，
+; 輸出一份關於這個語言自己的報告。
+
+(load "yan/lib/list.yn")
+(load "yan/lib/strings.yn")
+(load "yan/lib/math.yn")
+
+; ── 讀取歷史 ──────────────────────────────────────────────────
+
+(define all-entries (my-history))
+
+(define run-entries
+  (filter (lambda (e)
+            (and (pair? e) (equal? (car e) 'run)))
+          all-entries))
+
+(define test-entries
+  (filter (lambda (e)
+            (and (pair? e) (equal? (car e) 'test)))
+          all-entries))
+
+(define n (length run-entries))
+
+; ── 輔助 ──────────────────────────────────────────────────────
+
+(define (run-timestamp e) (cadr e))
+(define (run-duration  e) (caddr e))
+(define (run-exprs     e) (list-ref e 3))
+(define (run-depth     e) (list-ref e 4))
+(define (run-errors    e) (list-ref e 5))
+
+(define (date-of ts)
+  (substring ts 0 10))
+
+; ── 計算統計 ──────────────────────────────────────────────────
+
+(define durations  (map run-duration  run-entries))
+(define exprs-list (map run-exprs     run-entries))
+(define depths     (map run-depth     run-entries))
+(define errors     (map run-errors    run-entries))
+
+(define total-secs    (sum durations))
+(define total-exprs   (sum exprs-list))
+(define avg-exprs     (if (= n 0) 0 (round (/ total-exprs n))))
+(define max-depth     (if (null? depths) 0 (fold-left max 0 depths)))
+(define error-count   (count (lambda (e) (> e 0)) errors))
+
+; 按日期分組
+(define by-date
+  (group-by (lambda (e) (date-of (run-timestamp e)))
+            run-entries))
+
+; ── 格式化工具 ────────────────────────────────────────────────
+
+(define (seconds->str s)
+  (cond
+    ((< s 60)   (format "~a 秒" (round s)))
+    ((< s 3600) (format "~a 分鐘" (round (/ s 60))))
+    (else       (format "~a 小時" (round (/ s 3600))))))
+
+(define (pct n total)
+  (if (= total 0) "0%"
+      (format "~a%" (round (* 100 (/ n total))))))
+
+(define (bar-line label value max-val width)
+  (let* ((filled (if (= max-val 0) 0
+                     (round (* width (/ value max-val)))))
+         (bar    (string-append (string-repeat "█" filled)
+                                (string-repeat "░" (- width filled)))))
+    (format "  ~a ~a ~a" (string-pad-right label 6) bar value)))
+
+; ── 報告 ──────────────────────────────────────────────────────
+
+(display "\n言的自我分析\n")
+(display "══════════════════════════════════════\n\n")
+
+; 基本統計
+(display "執行歷史\n")
+(printf "  總共跑過    ~a 次\n" n)
+(printf "  累計時間    ~a\n" (seconds->str total-secs))
+(printf "  累計表達式  ~a 個\n" total-exprs)
+(printf "  平均每次    ~a 個表達式\n" avg-exprs)
+(printf "  最深遞迴    ~a 層\n" max-depth)
+(printf "  出錯執行    ~a 次（~a）\n" error-count (pct error-count n))
+
+; 趨勢
+(newline)
+(display "最近 20 次趨勢\n")
+(printf "  表達式  ~a\n" (history-sparkline "exprs" 20))
+(printf "  深度    ~a\n" (history-sparkline "depth" 20))
+
+; 按日期統計
+(when (> (length by-date) 0)
+  (newline)
+  (display "按日期\n")
+  (let ((max-day-count
+         (fold-left max 1
+                    (map (lambda (g) (length (cadr g))) by-date))))
+    (for-each
+      (lambda (g)
+        (let ((date  (car g))
+              (count (length (cadr g))))
+          (display (bar-line date count max-day-count 20))
+          (newline)))
+      by-date)))
+
+; 最近一次測試
+(newline)
+(display "健康\n")
+(if (null? test-entries)
+    (display "  從未執行過測試\n")
+    (let* ((last  (car (reverse test-entries)))
+           (pass  (caddr last))           ; index 2
+           (fail  (list-ref last 3))      ; index 3
+           (total (list-ref last 4))      ; index 4
+           (ok?   (equal? (list-ref last 5) 'ok)))  ; index 5
+      (printf "  上次測試  ~a/~a ~a\n"
+              pass total (if ok? "✓ 全通過" "✗ 有失敗"))))
+
+; 自我描述
+(newline)
+(display "自我描述\n")
+(let* ((s      (self-summary))
+       (trend  (cadr (assoc 'trend  (cdr s))))
+       (health (cadr (assoc 'health (cdr s)))))
+  (printf "  趨勢    ~a\n" trend)
+  (printf "  健康    ~a\n" health)
+  (printf "  版本    ~a\n" (yan-version)))
+
+(newline)
+(display "數字從真實執行歷史算出，不是猜測。\n")

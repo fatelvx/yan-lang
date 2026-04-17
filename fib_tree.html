@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>fib 的生長</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: #05050e;
+  font-family: 'Courier New', monospace;
+  color: #556;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 36px 20px;
+}
+h1 {
+  font-size: 11px;
+  color: #334;
+  letter-spacing: 5px;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.sub {
+  font-size: 9px;
+  color: #1e1e30;
+  margin-bottom: 24px;
+  letter-spacing: 1px;
+}
+canvas {
+  border: 1px solid #0c0c1c;
+  border-radius: 3px;
+  display: block;
+}
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 18px 0 10px;
+}
+button {
+  background: #0c0c1c;
+  color: #556;
+  border: 1px solid #181830;
+  padding: 8px 22px;
+  cursor: pointer;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 12px;
+  letter-spacing: 1px;
+  transition: all 0.15s;
+}
+button:hover { background: #141428; color: #88a; }
+button.playing { color: #6cf; border-color: #248; background: #0a1525; }
+label { font-size: 10px; color: #2a2a3c; }
+input[type=range] { width: 80px; accent-color: #336; }
+.spd-v { font-size: 10px; color: #334; }
+.info {
+  font-size: 10px;
+  color: #1e1e30;
+  margin-top: 10px;
+  letter-spacing: 1px;
+  height: 14px;
+  transition: color 0.2s;
+}
+.info.active { color: #445; }
+</style>
+</head>
+<body>
+
+<h1>fib 的生長</h1>
+<div class="sub">fib(8) 呼叫樹 · 67 個節點 · 134 個事件</div>
+
+<canvas id="cv" width="1180" height="560"></canvas>
+
+<div class="controls">
+  <button id="btn" onclick="togglePlay()">▶ 播放</button>
+  <label>速度</label>
+  <input type="range" id="spd" min="10" max="500" value="60"
+         oninput="document.getElementById('spd-v').textContent=this.value+'ms'">
+  <span class="spd-v" id="spd-v">60ms</span>
+  <button onclick="reset()">↺ 重置</button>
+</div>
+<div class="info" id="info"></div>
+
+<script>
+const NODES  = [{"id": 0, "n": 8, "parent": null, "children": [1, 42], "x": 20.3359375, "y": 0, "value": 21, "color": "#f29b18", "color_dim": "rgba(242,155,24,0.25)", "color_glow": "#f29b18", "freq": 261.63}, {"id": 1, "n": 7, "parent": 0, "children": [2, 27], "x": 12.328125, "y": 1, "value": 13, "color": "#efe11c", "color_dim": "rgba(239,225,28,0.25)", "color_glow": "#efe11c", "freq": 293.66}, {"id": 2, "n": 6, "parent": 1, "children": [3, 18], "x": 7.34375, "y": 2, "value": 8, "color": "#b3eb20", "color_dim": "rgba(179,235,32,0.25)", "color_glow": "#b3eb20", "freq": 392.0}, {"id": 3, "n": 5, "parent": 2, "children": [4, 13], "x": 4.3125, "y": 3, "value": 5, "color": "#70e824", "color_dim": "rgba(112,232,36,0.25)", "color_glow": "#70e824", "freq": 523.25}, {"id": 4, "n": 4, "parent": 3, "children": [5, 10], "x": 2.375, "y": 4, "value": 3, "color": "#31e528", "color_dim": "rgba(49,229,40,0.25)", "color_glow": "#31e528", "freq": 659.26}, {"id": 5, "n": 3, "parent": 4, "children": [6, 9], "x": 1.25, "y": 5, "value": 2, "color": "#2be260", "color_dim": "rgba(43,226,96,0.25)", "color_glow": "#2be260", "freq": 783.99}, {"id": 6, "n": 2, "parent": 5, "children": [7, 8], "x": 0.5, "y": 6, "value": 1, "color": "#2fdf9d", "color_dim": "rgba(47,223,157,0.25)", "color_glow": "#2fdf9d", "freq": 1046.5}, {"id": 7, "n": 1, "parent": 6, "children": [], "x": 0.0, "y": 7, "value": 1, "color": "#32dbd5", "color_dim": "rgba(50,219,213,0.25)", "color_glow": "#32dbd5", "freq": 1318.51}, {"id": 8, "n": 0, "parent": 6, "children": [], "x": 1.0, "y": 7, "value": 0, "color": "#36a7d8", "color_dim": "rgba(54,167,216,0.25)", "color_glow": "#36a7d8", "freq": 1760.0}, {"id": 9, "n": 1, "parent": 5, "children": [], "x": 2.0, "y": 6, "value": 1, "color": "#32dbd5", "color_dim": "rgba(50,219,213,0.25)", "color_glow": "#32dbd5", "freq": 1318.51}, {"id": 10, "n": 2, "parent": 4, "children": [11, 12], "x": 3.5, "y": 5, "value": 1, "color": "#2fdf9d", "color_dim": "rgba(47,223,157,0.25)", "color_glow": "#2fdf9d", "freq": 1046.5}, {"id": 11, "n": 1, "parent": 10, "children": [], "x": 3.0, "y": 6, "value": 1, "color": "#32dbd5", "color_dim": "rgba(50,219,213,0.25)", "color_glow": "#32dbd5", "freq": 1318.51}, {"id": 12, "n": 0, "parent": 10, "children": [], "x": 4.0, "y": 6, "value": 0, "color": "#36a7d8", "color_dim": "rgba(54,167,216,0.25)", "color_glow": "#36a7d8", "freq": 1760.0}, {"id": 13, "n": 3, "parent": 3, "children": [14, 17], "x": 6.25, "y": 4, "value": 2, "color": "#2be260", "color_dim": "rgba(43,226,96,0.25)", "color_glow": "#2be260", "freq": 783.99}, {"id": 14, "n": 2, "parent": 13, "children": [15, 16], "x": 5.5, "y": 5, "value": 1, "color": "#2fdf9d", "color_dim": "rgba(47,223,157,0.25)", "color_glow": "#2fdf9d", "freq": 1046.5}, {"id": 15, "n": 1, "parent": 14, "children": [], "x": 5.0, "y": 6, "value": 1, "color": "#32dbd5", "color_dim": "rgba(50,219,213,0.25)", "color_glow": "#32dbd5", "freq": 1318.51}, {"id": 16, "n": 0, "parent": 14, "children": [], "x": 6.0, "y": 6, "value": 0, "color": "#36a7d8", "color_dim": "rgba(54,167,216,0.25)", "color_glow": "#36a7d8", "freq": 1760.0}, {"id": 17, "n": 1, "parent": 13, "children": [], "x": 7.0, "y": 5, "value": 1, "color": "#32dbd5", "color_dim": "rgba(50,219,213,0.25)", "color_glow": "#32dbd5", "freq": 1318.51}, {"id": 18, "n": 4, "parent": 2, "children": [19, 24], "x": 10.375, "y": 3, "value": 3, "color": "#31e528", "color_dim": "rgba(49,229,40,0.25)", "color_glow": "#31e528", "freq": 659.26}, {"id": 19, "n": 3, "parent": 18, "children": [20, 23], "x": 9.25, "y": 4, "value": 2, "color": "#2be260", "color_dim": "rgba(43,226,96,0.25)", "color_glow": "#2be260", "freq": 783.99}, {"id": 20, "n": 2, "parent": 19, "children": [21, 22], "x": 8.5, "y": 5, "value": 1, "color": "#2fdf9d", "color_dim": "rgba(47,223,157,0.25)", "color_glow": "#2fdf9d", "freq": 1046.5}, {"id": 21, "n": 1, "parent": 20, "children": [], "x": 8.0, "y": 6, "value": 1, "color": "#32dbd5", "color_dim": "rgba(50,219,213,0.25)", "color_glow": "#32dbd5", "freq": 1318.51}, {"id": 22, "n": 0, "parent": 20, "children": [], "x": 9.0, "y": 6, "value": 0, "color": "#36a7d8", "color_dim": "rgba(54,167,216,0.25)", "color_glow": "#36a7d8", "freq": 1760.0}, {"id": 23, "n": 1, "parent": 19, "children": [], "x": 10.0, "y": 5, "value": 1, "color": "#32dbd5", "color_dim": "rgba(50,219,213,0.25)", "color_glow": "#32dbd5", "freq": 1318.51}, {"id": 24, "n": 2, "parent": 18, "children": [25, 26], "x": 11.5, "y": 4, "value": 1, "color": "#2fdf9d", "color_dim": "rgba(47,223,157,0.25)", "color_glow": "#2fdf9d", "freq": 1046.5}, {"id": 25, "n": 1, "parent": 24, "children": [], "x": 11.0, "y": 5, "value": 1, "color": "#32dbd5", "color_dim": "rgba(50,219,213,0.25)", "color_glow": "#32dbd5", "freq": 1318.51}, {"id": 26, "n": 0, "parent": 24, "children": [], "x": 12.0, "y": 5, "value": 0, "color": "#36a7d8", "color_dim": "rgba(54,167,216,0.25)", "color_glow": "#36a7d8", "freq": 1760.0}, {"id": 27, "n": 5, "parent": 1, "children": [28, 37], "x": 17.3125, "y": 2, "value": 5, "color": "#70e824", "color_dim": "rgba(112,232,36,0.25)", "color_glow": "#70e824", "freq": 523.25}, {"id": 28, "n": 4, "parent": 27, "children": [29, 34], "x": 15.375, "y": 3, "value": 3, "color": "#31e528", "color_dim": "rgba(49,229,40,0.25)", "color_glow": "#31e528", "freq": 659.26}, {"id": 29, "n": 3, "parent": 28, "children": [30, 33], "x": 14.25, "y": 4, "value": 2, "color": "#2be260", "color_dim": "rgba(43,226,96,0.25)", "color_glow": "#2be260", "freq": 783.99}, {"id": 30, "n": 2, "parent": 29, "children": [31, 32], "x": 13.5, "y": 5, "value": 1, "color": "#2fdf9d", "color_dim": "rgba(47,223,157,0.25)", "color_glow": "#2fdf9d", "freq": 1046.5}, {"id": 31, "n": 1, "parent": 30, "children": [], "x": 13.0, "y": 6, "value": 1, "color": "#32dbd5", "color_dim": "rgba(50,219,213,0.25)", "color_glow": "#32dbd5", "freq": 1318.51}, {"id": 32, "n": 0, "parent": 30, "children": [], "x": 14.0, "y": 6, "value": 0, "color": "#36a7d8", "color_dim": "rgba(54,167,216,0.25)", "color_glow": "#36a7d8", "freq": 1760.0}, {"id": 33, "n": 1, "parent": 29, "children": [], "x": 15.0, "y": 5, "value": 1, "color": "#32dbd5", "color_dim": "rgba(50,219,213,0.25)", "color_glow": "#32dbd5", "freq": 1318.51}, {"id": 34, "n": 2, "parent": 28, "children": [35, 36], "x": 16.5, "y": 4, "value": 1, "color": "#2fdf9d", "color_dim": "rgba(47,223,157,0.25)", "color_glow": "#2fdf9d", "freq": 1046.5}, {"id": 35, "n": 1, "parent": 34, "children": [], "x": 16.0, "y": 5, "value": 1, "color": "#32dbd5", "color_dim": "rgba(50,219,213,0.25)", "color_glow": "#32dbd5", "freq": 1318.51}, {"id": 36, "n": 0, "parent": 34, "children": [], "x": 17.0, "y": 5, "value": 0, "color": "#36a7d8", "color_dim": "rgba(54,167,216,0.25)", "color_glow": "#36a7d8", "freq": 1760.0}, {"id": 37, "n": 3, "parent": 27, "children": [38, 41], "x": 19.25, "y": 3, "value": 2, "color": "#2be260", "color_dim": "rgba(43,226,96,0.25)", "color_glow": "#2be260", "freq": 783.99}, {"id": 38, "n": 2, "parent": 37, "children": [39, 40], "x": 18.5, "y": 4, "value": 1, "color": "#2fdf9d", "color_dim": "rgba(47,223,157,0.25)", "color_glow": "#2fdf9d", "freq": 1046.5}, {"id": 39, "n": 1, "parent": 38, "children": [], "x": 18.0, "y": 5, "value": 1, "color": "#32dbd5", "color_dim": "rgba(50,219,213,0.25)", "color_glow": "#32dbd5", "freq": 1318.51}, {"id": 40, "n": 0, "parent": 38, "children": [], "x": 19.0, "y": 5, "value": 0, "color": "#36a7d8", "color_dim": "rgba(54,167,216,0.25)", "color_glow": "#36a7d8", "freq": 1760.0}, {"id": 41, "n": 1, "parent": 37, "children": [], "x": 20.0, "y": 4, "value": 1, "color": "#32dbd5", "color_dim": "rgba(50,219,213,0.25)", "color_glow": "#32dbd5", "freq": 1318.51}, {"id": 42, "n": 6, "parent": 0, "children": [43, 58], "x": 28.34375, "y": 1, "value": 8, "color": "#b3eb20", "color_dim": "rgba(179,235,32,0.25)", "color_glow": "#b3eb20", "freq": 392.0}, {"id": 43, "n": 5, "parent": 42, "children": [44, 53], "x": 25.3125, "y": 2, "value": 5, "color": "#70e824", "color_dim": "rgba(112,232,36,0.25)", "color_glow": "#70e824", "freq": 523.25}, {"id": 44, "n": 4, "parent": 43, "children": [45, 50], "x": 23.375, "y": 3, "value": 3, "color": "#31e528", "color_dim": "rgba(49,229,40,0.25)", "color_glow": "#31e528", "freq": 659.26}, {"id": 45, "n": 3, "parent": 44, "children": [46, 49], "x": 22.25, "y": 4, "value": 2, "color": "#2be260", "color_dim": "rgba(43,226,96,0.25)", "color_glow": "#2be260", "freq": 783.99}, {"id": 46, "n": 2, "parent": 45, "children": [47, 48], "x": 21.5, "y": 5, "value": 1, "color": "#2fdf9d", "color_dim": "rgba(47,223,157,0.25)", "color_glow": "#2fdf9d", "freq": 1046.5}, {"id": 47, "n": 1, "parent": 46, "children": [], "x": 21.0, "y": 6, "value": 1, "color": "#32dbd5", "color_dim": "rgba(50,219,213,0.25)", "color_glow": "#32dbd5", "freq": 1318.51}, {"id": 48, "n": 0, "parent": 46, "children": [], "x": 22.0, "y": 6, "value": 0, "color": "#36a7d8", "color_dim": "rgba(54,167,216,0.25)", "color_glow": "#36a7d8", "freq": 1760.0}, {"id": 49, "n": 1, "parent": 45, "children": [], "x": 23.0, "y": 5, "value": 1, "color": "#32dbd5", "color_dim": "rgba(50,219,213,0.25)", "color_glow": "#32dbd5", "freq": 1318.51}, {"id": 50, "n": 2, "parent": 44, "children": [51, 52], "x": 24.5, "y": 4, "value": 1, "color": "#2fdf9d", "color_dim": "rgba(47,223,157,0.25)", "color_glow": "#2fdf9d", "freq": 1046.5}, {"id": 51, "n": 1, "parent": 50, "children": [], "x": 24.0, "y": 5, "value": 1, "color": "#32dbd5", "color_dim": "rgba(50,219,213,0.25)", "color_glow": "#32dbd5", "freq": 1318.51}, {"id": 52, "n": 0, "parent": 50, "children": [], "x": 25.0, "y": 5, "value": 0, "color": "#36a7d8", "color_dim": "rgba(54,167,216,0.25)", "color_glow": "#36a7d8", "freq": 1760.0}, {"id": 53, "n": 3, "parent": 43, "children": [54, 57], "x": 27.25, "y": 3, "value": 2, "color": "#2be260", "color_dim": "rgba(43,226,96,0.25)", "color_glow": "#2be260", "freq": 783.99}, {"id": 54, "n": 2, "parent": 53, "children": [55, 56], "x": 26.5, "y": 4, "value": 1, "color": "#2fdf9d", "color_dim": "rgba(47,223,157,0.25)", "color_glow": "#2fdf9d", "freq": 1046.5}, {"id": 55, "n": 1, "parent": 54, "children": [], "x": 26.0, "y": 5, "value": 1, "color": "#32dbd5", "color_dim": "rgba(50,219,213,0.25)", "color_glow": "#32dbd5", "freq": 1318.51}, {"id": 56, "n": 0, "parent": 54, "children": [], "x": 27.0, "y": 5, "value": 0, "color": "#36a7d8", "color_dim": "rgba(54,167,216,0.25)", "color_glow": "#36a7d8", "freq": 1760.0}, {"id": 57, "n": 1, "parent": 53, "children": [], "x": 28.0, "y": 4, "value": 1, "color": "#32dbd5", "color_dim": "rgba(50,219,213,0.25)", "color_glow": "#32dbd5", "freq": 1318.51}, {"id": 58, "n": 4, "parent": 42, "children": [59, 64], "x": 31.375, "y": 2, "value": 3, "color": "#31e528", "color_dim": "rgba(49,229,40,0.25)", "color_glow": "#31e528", "freq": 659.26}, {"id": 59, "n": 3, "parent": 58, "children": [60, 63], "x": 30.25, "y": 3, "value": 2, "color": "#2be260", "color_dim": "rgba(43,226,96,0.25)", "color_glow": "#2be260", "freq": 783.99}, {"id": 60, "n": 2, "parent": 59, "children": [61, 62], "x": 29.5, "y": 4, "value": 1, "color": "#2fdf9d", "color_dim": "rgba(47,223,157,0.25)", "color_glow": "#2fdf9d", "freq": 1046.5}, {"id": 61, "n": 1, "parent": 60, "children": [], "x": 29.0, "y": 5, "value": 1, "color": "#32dbd5", "color_dim": "rgba(50,219,213,0.25)", "color_glow": "#32dbd5", "freq": 1318.51}, {"id": 62, "n": 0, "parent": 60, "children": [], "x": 30.0, "y": 5, "value": 0, "color": "#36a7d8", "color_dim": "rgba(54,167,216,0.25)", "color_glow": "#36a7d8", "freq": 1760.0}, {"id": 63, "n": 1, "parent": 59, "children": [], "x": 31.0, "y": 4, "value": 1, "color": "#32dbd5", "color_dim": "rgba(50,219,213,0.25)", "color_glow": "#32dbd5", "freq": 1318.51}, {"id": 64, "n": 2, "parent": 58, "children": [65, 66], "x": 32.5, "y": 3, "value": 1, "color": "#2fdf9d", "color_dim": "rgba(47,223,157,0.25)", "color_glow": "#2fdf9d", "freq": 1046.5}, {"id": 65, "n": 1, "parent": 64, "children": [], "x": 32.0, "y": 4, "value": 1, "color": "#32dbd5", "color_dim": "rgba(50,219,213,0.25)", "color_glow": "#32dbd5", "freq": 1318.51}, {"id": 66, "n": 0, "parent": 64, "children": [], "x": 33.0, "y": 4, "value": 0, "color": "#36a7d8", "color_dim": "rgba(54,167,216,0.25)", "color_glow": "#36a7d8", "freq": 1760.0}];
+const EVENTS = [{"type": "call", "id": 0}, {"type": "call", "id": 1}, {"type": "call", "id": 2}, {"type": "call", "id": 3}, {"type": "call", "id": 4}, {"type": "call", "id": 5}, {"type": "call", "id": 6}, {"type": "call", "id": 7}, {"type": "return", "id": 7, "value": 1}, {"type": "call", "id": 8}, {"type": "return", "id": 8, "value": 0}, {"type": "return", "id": 6, "value": 1}, {"type": "call", "id": 9}, {"type": "return", "id": 9, "value": 1}, {"type": "return", "id": 5, "value": 2}, {"type": "call", "id": 10}, {"type": "call", "id": 11}, {"type": "return", "id": 11, "value": 1}, {"type": "call", "id": 12}, {"type": "return", "id": 12, "value": 0}, {"type": "return", "id": 10, "value": 1}, {"type": "return", "id": 4, "value": 3}, {"type": "call", "id": 13}, {"type": "call", "id": 14}, {"type": "call", "id": 15}, {"type": "return", "id": 15, "value": 1}, {"type": "call", "id": 16}, {"type": "return", "id": 16, "value": 0}, {"type": "return", "id": 14, "value": 1}, {"type": "call", "id": 17}, {"type": "return", "id": 17, "value": 1}, {"type": "return", "id": 13, "value": 2}, {"type": "return", "id": 3, "value": 5}, {"type": "call", "id": 18}, {"type": "call", "id": 19}, {"type": "call", "id": 20}, {"type": "call", "id": 21}, {"type": "return", "id": 21, "value": 1}, {"type": "call", "id": 22}, {"type": "return", "id": 22, "value": 0}, {"type": "return", "id": 20, "value": 1}, {"type": "call", "id": 23}, {"type": "return", "id": 23, "value": 1}, {"type": "return", "id": 19, "value": 2}, {"type": "call", "id": 24}, {"type": "call", "id": 25}, {"type": "return", "id": 25, "value": 1}, {"type": "call", "id": 26}, {"type": "return", "id": 26, "value": 0}, {"type": "return", "id": 24, "value": 1}, {"type": "return", "id": 18, "value": 3}, {"type": "return", "id": 2, "value": 8}, {"type": "call", "id": 27}, {"type": "call", "id": 28}, {"type": "call", "id": 29}, {"type": "call", "id": 30}, {"type": "call", "id": 31}, {"type": "return", "id": 31, "value": 1}, {"type": "call", "id": 32}, {"type": "return", "id": 32, "value": 0}, {"type": "return", "id": 30, "value": 1}, {"type": "call", "id": 33}, {"type": "return", "id": 33, "value": 1}, {"type": "return", "id": 29, "value": 2}, {"type": "call", "id": 34}, {"type": "call", "id": 35}, {"type": "return", "id": 35, "value": 1}, {"type": "call", "id": 36}, {"type": "return", "id": 36, "value": 0}, {"type": "return", "id": 34, "value": 1}, {"type": "return", "id": 28, "value": 3}, {"type": "call", "id": 37}, {"type": "call", "id": 38}, {"type": "call", "id": 39}, {"type": "return", "id": 39, "value": 1}, {"type": "call", "id": 40}, {"type": "return", "id": 40, "value": 0}, {"type": "return", "id": 38, "value": 1}, {"type": "call", "id": 41}, {"type": "return", "id": 41, "value": 1}, {"type": "return", "id": 37, "value": 2}, {"type": "return", "id": 27, "value": 5}, {"type": "return", "id": 1, "value": 13}, {"type": "call", "id": 42}, {"type": "call", "id": 43}, {"type": "call", "id": 44}, {"type": "call", "id": 45}, {"type": "call", "id": 46}, {"type": "call", "id": 47}, {"type": "return", "id": 47, "value": 1}, {"type": "call", "id": 48}, {"type": "return", "id": 48, "value": 0}, {"type": "return", "id": 46, "value": 1}, {"type": "call", "id": 49}, {"type": "return", "id": 49, "value": 1}, {"type": "return", "id": 45, "value": 2}, {"type": "call", "id": 50}, {"type": "call", "id": 51}, {"type": "return", "id": 51, "value": 1}, {"type": "call", "id": 52}, {"type": "return", "id": 52, "value": 0}, {"type": "return", "id": 50, "value": 1}, {"type": "return", "id": 44, "value": 3}, {"type": "call", "id": 53}, {"type": "call", "id": 54}, {"type": "call", "id": 55}, {"type": "return", "id": 55, "value": 1}, {"type": "call", "id": 56}, {"type": "return", "id": 56, "value": 0}, {"type": "return", "id": 54, "value": 1}, {"type": "call", "id": 57}, {"type": "return", "id": 57, "value": 1}, {"type": "return", "id": 53, "value": 2}, {"type": "return", "id": 43, "value": 5}, {"type": "call", "id": 58}, {"type": "call", "id": 59}, {"type": "call", "id": 60}, {"type": "call", "id": 61}, {"type": "return", "id": 61, "value": 1}, {"type": "call", "id": 62}, {"type": "return", "id": 62, "value": 0}, {"type": "return", "id": 60, "value": 1}, {"type": "call", "id": 63}, {"type": "return", "id": 63, "value": 1}, {"type": "return", "id": 59, "value": 2}, {"type": "call", "id": 64}, {"type": "call", "id": 65}, {"type": "return", "id": 65, "value": 1}, {"type": "call", "id": 66}, {"type": "return", "id": 66, "value": 0}, {"type": "return", "id": 64, "value": 1}, {"type": "return", "id": 58, "value": 3}, {"type": "return", "id": 42, "value": 8}, {"type": "return", "id": 0, "value": 21}];
+const MAX_X  = 33.0;
+const MAX_D  = 7;
+
+// ── 座標轉換 ─────────────────────────────────────────────────
+const W = 1180, H = 560;
+const PAD_L = 50, PAD_R = 50, PAD_T = 50, PAD_B = 30;
+const plotW = W - PAD_L - PAD_R;
+const plotH = H - PAD_T - PAD_B;
+const R = 13;  // 節點半徑
+
+function nodeX(n) { return PAD_L + (n.x / MAX_X) * plotW; }
+function nodeY(n) { return PAD_T + (n.y / MAX_D) * plotH; }
+
+// ── 渲染狀態 ─────────────────────────────────────────────────
+const visible   = new Set();   // 已出現的節點 id
+const returned  = new Set();   // 已回傳的節點 id
+const glowing   = new Map();   // id → glow_alpha（淡出用）
+
+const cv  = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+
+function draw() {
+  ctx.fillStyle = '#05050e';
+  ctx.fillRect(0, 0, W, H);
+
+  // 邊
+  visible.forEach(id => {
+    const n = NODES[id];
+    if (n.parent === null) return;
+    const p = NODES[n.parent];
+    if (!visible.has(p.id)) return;
+    ctx.beginPath();
+    ctx.moveTo(nodeX(p), nodeY(p));
+    ctx.lineTo(nodeX(n), nodeY(n));
+    ctx.strokeStyle = returned.has(id) ? n.color + '40' : '#1a1a2e';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  });
+
+  // 節點
+  visible.forEach(id => {
+    const n  = NODES[id];
+    const x  = nodeX(n), y = nodeY(n);
+    const ret = returned.has(id);
+    const gl  = glowing.get(id) || 0;
+
+    // 光暈
+    if (gl > 0) {
+      ctx.shadowColor = n.color;
+      ctx.shadowBlur  = 24 * gl;
+    }
+
+    // 圓圈
+    ctx.beginPath();
+    ctx.arc(x, y, R, 0, Math.PI * 2);
+    ctx.fillStyle   = ret ? n.color : n.color_dim;
+    ctx.fill();
+    ctx.strokeStyle = ret ? n.color + 'cc' : '#1e1e35';
+    ctx.lineWidth   = ret ? 1.5 : 1;
+    ctx.stroke();
+
+    ctx.shadowBlur = 0;
+
+    // 標籤
+    ctx.fillStyle = ret ? '#fff' : '#334';
+    ctx.font = `${ret ? 'bold ' : ''}${R < 10 ? 8 : 10}px monospace`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(n.n, x, y);
+  });
+}
+
+// ── 音訊 ─────────────────────────────────────────────────────
+let ac = null;
+function getAC() {
+  if (!ac) ac = new (window.AudioContext || window.webkitAudioContext)();
+  return ac;
+}
+
+function beep(freq, when, dur, gain, type='triangle') {
+  const ctx  = getAC();
+  const osc  = ctx.createOscillator();
+  const g    = ctx.createGain();
+  osc.type = type;
+  osc.frequency.value = freq;
+  g.gain.setValueAtTime(gain, when);
+  g.gain.linearRampToValueAtTime(0.0001, when + dur);
+  osc.connect(g); g.connect(ctx.destination);
+  osc.start(when); osc.stop(when + dur + 0.01);
+}
+
+// ── 播放 ─────────────────────────────────────────────────────
+let playing  = false;
+let evtIdx   = 0;
+let lastTime = 0;
+let rafId    = null;
+
+function togglePlay() {
+  if (playing) pause(); else play();
+}
+
+async function play() {
+  const ac2 = getAC();
+  if (ac2.state === 'suspended') await ac2.resume();
+  playing = true;
+  document.getElementById('btn').textContent = '❙❙ 暫停';
+  document.getElementById('btn').classList.add('playing');
+  lastTime = performance.now();
+  rafId = requestAnimationFrame(step);
+}
+
+function pause() {
+  playing = false;
+  document.getElementById('btn').textContent = '▶ 繼續';
+  document.getElementById('btn').classList.remove('playing');
+  if (rafId) cancelAnimationFrame(rafId);
+}
+
+function reset() {
+  pause();
+  visible.clear(); returned.clear(); glowing.clear();
+  evtIdx = 0;
+  document.getElementById('btn').textContent = '▶ 播放';
+  document.getElementById('info').textContent = '';
+  document.getElementById('info').classList.remove('active');
+  draw();
+}
+
+function step(now) {
+  if (!playing) return;
+  const ms = parseInt(document.getElementById('spd').value);
+  if (now - lastTime < ms) {
+    rafId = requestAnimationFrame(step);
+    return;
+  }
+  lastTime = now;
+
+  if (evtIdx >= EVENTS.length) {
+    pause();
+    document.getElementById('btn').textContent = '▶ 重播';
+    return;
+  }
+
+  const ev = EVENTS[evtIdx++];
+  const n  = NODES[ev.id];
+  const ac2 = getAC();
+
+  if (ev.type === 'call') {
+    visible.add(ev.id);
+    // 音：呼叫時短促一聲
+    beep(n.freq, ac2.currentTime, 0.08, 0.15);
+
+    const info = document.getElementById('info');
+    info.textContent = `fib(${n.n}) 呼叫`;
+    info.classList.add('active');
+
+  } else {
+    returned.add(ev.id);
+    glowing.set(ev.id, 1.0);
+    // 音：回傳時稍長一點，稍亮
+    beep(n.freq * 2, ac2.currentTime, 0.12, 0.10, 'sine');
+
+    const info = document.getElementById('info');
+    info.textContent = `fib(${n.n}) = ${ev.value}`;
+    info.classList.add('active');
+  }
+
+  // 淡出光暈
+  glowing.forEach((alpha, id) => {
+    const a2 = alpha - 0.15;
+    if (a2 <= 0) glowing.delete(id);
+    else glowing.set(id, a2);
+  });
+
+  draw();
+  rafId = requestAnimationFrame(step);
+}
+
+// 初始畫面
+draw();
+</script>
+</body>
+</html>

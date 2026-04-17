@@ -1,0 +1,103 @@
+; Church Encoding — 用 lambda 重建數字與邏輯
+;
+; Church 編碼是這件事：
+;   你可以只用函式表示所有東西。
+;   數字不是數字，而是「被套用 n 次」這件事本身。
+;
+; 這個展示沒有任何實用目的，但它很美。
+
+; ── Church 布林 ─────────────────────────────────────────
+
+(define church-true  (lambda (t) (lambda (f) t)))
+(define church-false (lambda (t) (lambda (f) f)))
+
+(define (church-if c t f) ((c t) f))
+(define (church-not b) ((b church-false) church-true))
+(define (church-and a b) ((a b) church-false))
+(define (church-or  a b) ((a church-true) b))
+
+; 轉回 Python 布林
+(define (church->bool b) ((b #t) #f))
+
+(print (church->bool church-true))    ; #t
+(print (church->bool church-false))   ; #f
+(print (church->bool (church-not church-true)))   ; #f
+(print (church->bool (church-and church-true church-false))) ; #f
+(print (church->bool (church-or  church-false church-true))) ; #t
+
+
+; ── Church 數字 ─────────────────────────────────────────
+
+; Church numeral n = (lambda (f) (lambda (x) (f (f ... (f x)...))))
+;                    ← f applied n times to x →
+
+(define zero  (lambda (f) (lambda (x) x)))
+(define one   (lambda (f) (lambda (x) (f x))))
+(define two   (lambda (f) (lambda (x) (f (f x)))))
+(define three (lambda (f) (lambda (x) (f (f (f x))))))
+
+; successor: n+1
+(define (succ n)
+  (lambda (f)
+    (lambda (x)
+      (f ((n f) x)))))
+
+; addition: m + n
+(define (church+ m n)
+  (lambda (f)
+    (lambda (x)
+      ((m f) ((n f) x)))))
+
+; multiplication: m * n
+(define (church* m n)
+  (lambda (f) (n (m f))))
+
+; exponentiation: m^n
+(define (church-expt m n) (n m))
+
+; convert Church numeral → integer
+(define (church->int n) ((n inc) 0))
+
+; convert integer → Church numeral
+(define (int->church n)
+  (if (= n 0) zero (succ (int->church (- n 1)))))
+
+(define four  (succ three))
+(define five  (church+ two three))
+(define eight (church* two four))
+
+(print (church->int zero))   ; 0
+(print (church->int three))  ; 3
+(print (church->int five))   ; 5
+(print (church->int eight))  ; 8
+
+; 2^3 = 8
+(print (church->int (church-expt two three)))  ; 8
+
+; 3^3 = 27
+(print (church->int (church-expt three three)))  ; 27
+
+(display "\n前十個 Church 數字：") (newline)
+(print (map church->int
+            (map int->church '(0 1 2 3 4 5 6 7 8 9))))
+
+
+; ── Y Combinator ──────────────────────────────────────────
+; 遞迴，但不允許自我引用。
+; 只用 lambda，推導出遞迴。
+
+(define Y
+  (lambda (f)
+    ((lambda (x) (f (lambda (v) ((x x) v))))
+     (lambda (x) (f (lambda (v) ((x x) v)))))))
+
+; factorial via Y combinator
+(define fact
+  (Y (lambda (self)
+       (lambda (n)
+         (if (<= n 0) 1 (* n (self (- n 1))))))))
+
+(display "\nY combinator factorial:") (newline)
+(print (fact 0))   ; 1
+(print (fact 5))   ; 120
+(print (fact 10))  ; 3628800

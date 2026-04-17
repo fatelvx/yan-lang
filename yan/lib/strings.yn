@@ -1,0 +1,84 @@
+; yan/lib/strings.yn — 字串工具庫
+;
+; 用法：(load "yan/lib/strings.yn")
+;
+; 補充 yan.py 內建字串函式沒有涵蓋的高層操作。
+
+; ── 測試 ──────────────────────────────────────────────────────
+
+(define (string-starts-with? s prefix)
+  (and (>= (string-length s) (string-length prefix))
+       (equal? (substring s 0 (string-length prefix)) prefix)))
+
+(define (string-ends-with? s suffix)
+  (let ((sl (string-length s))
+        (fl (string-length suffix)))
+    (and (>= sl fl)
+         (equal? (substring s (- sl fl) sl) suffix))))
+
+(define (string-empty? s)
+  (= (string-length s) 0))
+
+; ── 切割與合併 ────────────────────────────────────────────────
+
+(define (words s)
+  (filter (lambda (w) (not (string-empty? w)))
+          (string-split (string-trim s) " ")))
+
+(define (lines s)
+  (string-split s "\n"))
+
+(define (unlines lst)
+  (string-join lst "\n"))
+
+(define (unwords lst)
+  (string-join lst " "))
+
+; ── 填充與重複 ────────────────────────────────────────────────
+
+(define (string-repeat s n)
+  (let loop ((i n) (acc ""))
+    (if (= i 0) acc
+        (loop (- i 1) (string-append acc s)))))
+
+(define (string-pad-right s width)
+  (let ((pad (- width (string-length s))))
+    (if (<= pad 0) s
+        (string-append s (string-repeat " " pad)))))
+
+(define (string-pad-left s width)
+  (let ((pad (- width (string-length s))))
+    (if (<= pad 0) s
+        (string-append (string-repeat " " pad) s))))
+
+; ── 轉換 ──────────────────────────────────────────────────────
+
+(define (string-capitalize s)
+  (if (string-empty? s) s
+      (string-append
+        (string-upcase (substring s 0 1))
+        (string-downcase (substring s 1 (string-length s))))))
+
+; ── 數字與字串互換 ────────────────────────────────────────────
+
+(define (->string x)
+  (cond
+    ((string? x)  x)
+    ((number? x)  (number->string x))
+    ((boolean? x) (if x "#t" "#f"))
+    ((null? x)    "()")
+    ((symbol? x)  (symbol->string x))
+    (else         (format "~s" x))))
+
+; ── 樸素模板 ──────────────────────────────────────────────────
+; (interpolate "hello ~a, you are ~a years old" (list "world" 30))
+; → "hello world, you are 30 years old"
+
+(define (interpolate template args)
+  (let loop ((parts (string-split template "~a")) (rest args) (acc ""))
+    (if (null? (cdr parts))
+        (string-append acc (car parts))
+        (loop (cdr parts)
+              (if (null? rest) rest (cdr rest))
+              (string-append acc (car parts)
+                             (if (null? rest) "~a" (->string (car rest))))))))
