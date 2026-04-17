@@ -18,9 +18,11 @@
       (cons (car lst) (init (cdr lst)))))
 
 (define (nth lst n)
-  (if (= n 0)
-      (car lst)
-      (nth (cdr lst) (- n 1))))
+  (if (null? lst)
+      (error "nth: 索引超出範圍")
+      (if (= n 0)
+          (car lst)
+          (nth (cdr lst) (- n 1)))))
 
 ; ── 切片 ──────────────────────────────────────────────────────
 

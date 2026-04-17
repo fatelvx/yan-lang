@@ -8,7 +8,8 @@
 (define (cube   x) (* x x x))
 
 (define (average lst)
-  (/ (fold-left + 0 lst) (length lst)))
+  (if (null? lst) 0
+      (/ (fold-left + 0 lst) (length lst))))
 
 (define (clamp x lo hi)
   (max lo (min hi x)))
@@ -22,7 +23,9 @@
   (if (= b 0) a (gcd b (modulo a b))))
 
 (define (lcm a b)
-  (/ (* a b) (gcd a b)))
+  (if (= a 0) 0
+      (if (= b 0) 0
+          (/ (abs (* a b)) (gcd a b)))))
 
 (define (prime? n)
   (if (< n 2) #f

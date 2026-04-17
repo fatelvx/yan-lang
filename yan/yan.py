@@ -134,8 +134,7 @@ def _maybe_archive():
 def _parse_one(line: str):
     """Parse a single journal line."""
     try:
-        from io import StringIO
-        return parse(line.strip())
+        return read_one(line.strip())
     except Exception:
         return None
 
@@ -150,14 +149,23 @@ def _append_raw(entry_str: str):
 
 
 def _load_journal() -> list:
-    """Parse journal.yn and return list of run entries as Yán data."""
+    """Parse journal.yn line by line; bad lines are skipped instead of losing all data."""
     if not os.path.exists(_JOURNAL_PATH):
         return []
+    result = []
     try:
-        src = open(_JOURNAL_PATH, encoding='utf-8').read()
-        return parse_all(src)
+        with open(_JOURNAL_PATH, encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    result.append(read_one(line))
+                except Exception:
+                    pass
     except Exception:
-        return []
+        pass
+    return result
 
 def _user_journal_path(name: str) -> str:
     """每個使用者自己的 journal 路徑。"""
@@ -967,15 +975,19 @@ def eval_yn(expr, env: Env) -> Any:
             path = eval_yn(raw_path, env) if not isinstance(raw_path, str) else raw_path
             # Resolve: try cwd, then yan/ parent, then relative to yan.py
             _here = os.path.dirname(os.path.abspath(__file__))
+            resolved = None
             for candidate in [path,
                                os.path.join(_here, '..', path),
                                os.path.join(_here, path)]:
                 if os.path.exists(candidate):
-                    path = candidate; break
+                    resolved = candidate; break
+            if resolved is None:
+                raise LispError(f"import：找不到檔案 {path!r}")
+            path = resolved
             if len(expr) >= 4 and str(expr[2]) == 'as':
                 ns_name = expr[3]
                 ns_env  = Env(outer=env)
-                _load_file(path, ns_env)
+                _exec_file(path, ns_env)
                 _ns_env = ns_env  # capture
                 def _make_ns(e):
                     def _ns(key):
@@ -985,7 +997,7 @@ def eval_yn(expr, env: Env) -> Any:
                     return _ns
                 env[ns_name] = _make_ns(ns_env)
             else:
-                _load_file(path, env)
+                _exec_file(path, env)
             return None
 
         if head == sym('values'):
@@ -1231,9 +1243,6 @@ def _make_global_env() -> Env:
         sym('zip'): lambda *lsts: [list(t) for t in zip(*lsts)],
         sym('take'): lambda lst, n: lst[:n],
         sym('drop'): lambda lst, n: lst[n:],
-        sym('flatten'): lambda lst: [
-            x for sub in lst for x in (sub if isinstance(sub, list) else [sub])
-        ],
         sym('range'): lambda *args: list(range(*[int(a) for a in args])),
     })
 
@@ -1253,7 +1262,6 @@ def _make_global_env() -> Env:
         sym('string-split'): lambda s, sep=' ': s.split(sep),
         sym('string-join'): lambda lst, sep='': sep.join(lst),
         sym('string-trim'): str.strip,
-        sym('number->string'): str,
         sym('symbol->string'): str,
         sym('string->symbol'): sym,
         sym('string-replace'): lambda s, old, new: s.replace(old, new),
@@ -1300,7 +1308,7 @@ def _make_global_env() -> Env:
         sym('newline'):  lambda port=None: print(file=(port.f if port else sys.stdout)) or None,
         sym('read-line'): lambda port=None: (port.f if port else sys.stdin).readline().rstrip('\n'),
         sym('read'):     lambda port=None: read_one((port.f if port else sys.stdin).readline()),
-        sym('eval-string'): lambda s: eval_yn(parse(str(s)), env),
+        sym('eval-string'): lambda s: eval_yn(read_one(str(s)), env),
         sym('print'):    lambda *xs: print(*[
             x if isinstance(x, str) and not isinstance(x, Symbol) else yn_repr(x)
             for x in xs]) or None,
@@ -1310,7 +1318,7 @@ def _make_global_env() -> Env:
         sym('open-output-file'): lambda path: Port(open(path, 'w', encoding='utf-8')),
         sym('close-port'):  lambda p: p.f.close() or None,
         sym('with-output-to-file'): lambda path, thunk: _with_output(path, thunk),
-        sym('load'): lambda path: _load_file(path, env),
+        sym('load'): lambda path: _exec_file(path, env),
         # ── 便利的檔案讀寫 ──────────────────────────────────────────
         sym('read-file'):  lambda path: open(path, encoding='utf-8').read(),
         sym('write-file'): lambda path, text: (
@@ -1537,9 +1545,11 @@ def _make_global_env() -> Env:
             if isinstance(e, list) and len(e) >= 4
             and e[0] == sym('note') and e[1] == str(name)
         ],
-        sym('sort'): lambda lst, less: sorted(lst, key=functools.cmp_to_key(
-            lambda a, b: -1 if less(a, b) else (1 if less(b, a) else 0)
-        )),
+        sym('sort'): lambda lst, less=None: (
+            sorted(lst, key=functools.cmp_to_key(
+                lambda a, b: -1 if less(a, b) else (1 if less(b, a) else 0)))
+            if less else sorted(lst)
+        ),
         sym('record-test-result'): lambda pass_, fail: _append_raw(
             f'(test "{datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S")}" '
             f'{int(pass_)} {int(fail)} '
@@ -1582,9 +1592,7 @@ def _make_global_env() -> Env:
         sym('time'): lambda thunk: _timed(thunk),
         sym('random'): __import__('random').random,
         sym('random-integer'): __import__('random').randint,
-        sym('shuffle'): lambda lst: (
-            (cp := lst[:]) or __import__('random').shuffle(cp) or cp
-        ),
+        sym('shuffle'): lambda lst: __import__('random').sample(lst, len(lst)),
 
         # ── 時間 ────────────────────────────────────────────────────
         sym('now'):        lambda: __import__('datetime').datetime.now().strftime('%Y-%m-%dT%H:%M:%S'),
@@ -1633,7 +1641,7 @@ def _timed(thunk):
     print(f"; 耗時 {dt*1000:.3f} ms")
     return result
 
-def _load_file(path, env):
+def _exec_file(path, env):
     with open(path, encoding='utf-8') as f:
         src = f.read()
     for node in parse_all(src):
@@ -2182,7 +2190,7 @@ def make_standard_env() -> Env:
         _lib_path = os.path.join(_lib_dir, _lib)
         if os.path.exists(_lib_path):
             try:
-                _load_file(_lib_path, env)
+                _exec_file(_lib_path, env)
             except Exception:
                 pass   # 不因標準庫失敗而中斷
     return env
