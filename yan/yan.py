@@ -219,6 +219,61 @@ def _load_file(path: str) -> list:
         return []
 
 
+def _vitality_score() -> tuple:
+    """
+    活力值 [0.0, 1.0]，從近期執行歷史計算，不是單一快照。
+    回傳 (score, trend_sym)。
+
+    - 越近的執行權重越高
+    - 有錯誤的執行拉低分數，無錯誤的拉高
+    - 測試結果（近五次）也納入
+    - trend：recovering / stable / declining / new
+    """
+    all_entries = _load_journal()
+    runs  = [e for e in all_entries
+             if isinstance(e, list) and e and e[0] == sym('run')]
+    tests = [e for e in all_entries
+             if isinstance(e, list) and e and e[0] == sym('test')]
+
+    if not runs:
+        return (1.0, sym('new'))
+
+    recent_runs = runs[-10:]
+
+    # 加權平均，越新的權重越大
+    total_w, weighted = 0.0, 0.0
+    for i, r in enumerate(recent_runs):
+        w   = float(i + 1)
+        err = r[5] if len(r) > 5 and isinstance(r[5], (int, float)) else 0
+        run_score = 1.0 if err == 0 else max(0.1, 1.0 - min(err, 3) * 0.3)
+        weighted += run_score * w
+        total_w  += w
+    score = weighted / total_w if total_w else 1.0
+
+    # 融入近五次測試結果（40% 權重）
+    if tests:
+        t_scores = [1.0 if len(t) > 5 and str(t[5]) == 'ok' else 0.3
+                    for t in tests[-5:]]
+        score = score * 0.6 + (sum(t_scores) / len(t_scores)) * 0.4
+
+    score = round(max(0.0, min(1.0, score)), 3)
+
+    # 趨勢：最近三次錯誤 vs 之前三次
+    trend = sym('stable')
+    if len(recent_runs) >= 6:
+        def errs(runs_slice):
+            return sum(r[5] if len(r) > 5 and isinstance(r[5], (int, float)) else 0
+                       for r in runs_slice)
+        r_err = errs(recent_runs[-3:])
+        o_err = errs(recent_runs[-6:-3])
+        if r_err < o_err:   trend = sym('recovering')
+        elif r_err > o_err: trend = sym('declining')
+    elif len(recent_runs) < 3:
+        trend = sym('new')
+
+    return (score, trend)
+
+
 def _note_decay(ts_str: str, original_conf: float, pinned: bool = False) -> float:
     """時間衰退。pinned 記憶衰退極慢（0.995/週，最低 0.85）；普通記憶 0.9/週，最低 0.1。"""
     try:
@@ -1293,9 +1348,7 @@ def _make_global_env() -> Env:
              if isinstance(e, list) and e and e[0] == sym('test')),
             None
         )
-        health = sym('unknown')
-        if last_test and len(last_test) >= 6:
-            health = last_test[5]   # index 5 = ok/fail
+        v_score, v_trend = _vitality_score()
 
         return [sym('self'),
                 [sym('runs'),        n],
@@ -1304,7 +1357,8 @@ def _make_global_env() -> Env:
                 [sym('error-rate'),  error_rate],
                 [sym('max-depth'),   max_depth],
                 [sym('trend'),       trend],
-                [sym('health'),      health]]
+                [sym('vitality'),    v_score],
+                [sym('vitality-trend'), v_trend]]
 
     def _history_series(kind='exprs', last=20):
         """
@@ -1345,6 +1399,8 @@ def _make_global_env() -> Env:
 
     env.update({
         sym('times-run'):         lambda: _times_run(),
+        sym('vitality'):          lambda: _vitality_score()[0],
+        sym('vitality-trend'):    lambda: _vitality_score()[1],
         sym('my-history'):        lambda: _my_history(),
         sym('my-history-all'):    lambda: _load_journal() + (
             _load_file(_ARCHIVE_PATH) if os.path.exists(_ARCHIVE_PATH) else []
@@ -1785,15 +1841,27 @@ def _make_banner() -> str:
              if isinstance(e, list) and e and e[0] == sym('test')),
             None
         )
-        if last_test and len(last_test) >= 6:
-            health_sym = str(last_test[5])   # index 5 = ok/fail
-            if health_sym == 'ok':
-                health_str = f"  {GREEN}✓ 上次測試全通過{RESET}"
-            else:
-                fail_n = last_test[3] if len(last_test) > 3 else '?'
-                health_str = f"  {YELLOW}⚠ 上次測試有 {fail_n} 個失敗{RESET}"
-        else:
+        v_score, v_trend = _vitality_score()
+        if v_trend == sym('new'):
             health_str = ""
+        else:
+            pct = int(round(v_score * 100))
+            if v_score >= 0.85:
+                bar   = GREEN
+                label = "健康"
+            elif v_score >= 0.6:
+                bar   = YELLOW
+                label = "還好"
+            else:
+                bar   = RED
+                label = "不太對勁"
+            trend_tag = {
+                sym('recovering'): "  回升中",
+                sym('declining'):  "  在走下坡",
+                sym('stable'):     "",
+                sym('new'):        "",
+            }.get(v_trend, "")
+            health_str = f"  {bar}{label} {pct}%{trend_tag}{RESET}"
 
         # 等待感：距離上次執行過了多久
         last_run_entry = next(
@@ -1907,6 +1975,8 @@ HELP_TEXT = f"""
   (self-summary)                結構化自我描述
   (history-sparkline "exprs")   趨勢線
   (yan-version)                 版本號
+  (vitality)                    活力值 0.0-1.0（近期執行趨勢）
+  (vitality-trend)              recovering / stable / declining / new
   (last-test-result)            最近一次測試結果
 
 {YELLOW}標準庫（啟動時自動載入）{RESET}
