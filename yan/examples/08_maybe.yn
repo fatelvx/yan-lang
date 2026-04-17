@@ -1,6 +1,7 @@
-; 08_maybe.yn — 不確定的語言
+; 08_maybe.yn — 不確定的語言 / Uncertainty as a value
 ;
 ; 在言裡加入 maybe 值：
+; Add a first-class uncertainty value to Yán:
 ;   (maybe val conf) 表示「這個值是 val，置信度是 conf (0.0–1.0)」
 ;
 ; 普通語言裡，不確定是錯誤。

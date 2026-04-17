@@ -1,5 +1,8 @@
-; 言 (Yán) — 基礎示範
-; 這個檔案展示語言最基本的面貌
+; 01_basics.yn — 言 (Yán) 基礎示範
+; Basic language walkthrough for Yán.
+;
+; 這個檔案展示語言最基本的面貌：數值、函式、遞迴、閉包。
+; This file demonstrates core language behavior: values, functions, recursion, closures.
 
 ; ── 數值與算術 ──────────────────────────────────────────
 

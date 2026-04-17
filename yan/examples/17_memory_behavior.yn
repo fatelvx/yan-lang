@@ -1,6 +1,7 @@
-; 17_memory_behavior.yn
+; 17_memory_behavior.yn — 記憶影響行為
 ;
 ; 記憶影響行為。
+; Memory is not only logged; it actively changes behavior.
 ;
 ; 這個範例展示：言不只記錄——記憶改變它接下來做什麼。
 ; 每次執行，它的反應會因為歷史而不同。

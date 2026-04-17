@@ -141,7 +141,7 @@ function getAudioCtx() {
 }
 
 // 播放單個音符（最簡潔可靠的版本）
-function scheduleNote(ac, freq, startTime, duration, gainVal) {
+function scheduleNote(ac, freq, startTime, duration, gainVal, bus = null) {
   const osc  = ac.createOscillator();
   const gain = ac.createGain();
 
@@ -153,9 +153,10 @@ function scheduleNote(ac, freq, startTime, duration, gainVal) {
   gain.gain.linearRampToValueAtTime(0.0001, startTime + duration);
 
   osc.connect(gain);
-  gain.connect(ac.destination);
+  gain.connect(bus || ac.destination);
   osc.start(startTime);
   osc.stop(startTime + duration + 0.02);
+  return osc;
 }
 
 // ── 播放控制 ────────────────────────────────────────────────
@@ -174,12 +175,19 @@ async function startTrack(id) {
 
   setStatus('音訊已啟動，準備播放…');
 
+  // 每個 track 各自一條 bus，避免互相影響
+  const bus = ac.createGain();
+  bus.gain.setValueAtTime(1.0, ac.currentTime);
+  bus.connect(ac.destination);
+
   const startAudio = ac.currentTime + 0.15;
 
+  const sources = [];
   notes.forEach((n, i) => {
     const t   = startAudio + i * secPerNote;
     const dur = Math.max(secPerNote * 1.6, 0.04);
-    scheduleNote(ac, n.freq, t, dur, 0.28);
+    const osc = scheduleNote(ac, n.freq, t, dur, 0.28, bus);
+    sources.push(osc);
   });
 
   const totalMs = notes.length * ms;
@@ -198,7 +206,7 @@ async function startTrack(id) {
     }
   }
 
-  playState[id] = { startWall, totalMs, raf: null };
+  playState[id] = { startWall, totalMs, raf: null, sources, bus };
   document.getElementById(ds.btn).textContent = '■ 停止';
   document.getElementById(ds.btn).classList.add('playing');
   raf = requestAnimationFrame(draw);
@@ -209,6 +217,13 @@ async function startTrack(id) {
 function stopTrack(id) {
   const st = playState[id];
   if (!st) return;
+  const ac = getAudioCtx();
+  if (st.bus) {
+    // 先快速淡出此 track，避免砍到其他 track 的尾音
+    st.bus.gain.cancelScheduledValues(ac.currentTime);
+    st.bus.gain.setValueAtTime(st.bus.gain.value, ac.currentTime);
+    st.bus.gain.linearRampToValueAtTime(0.0001, ac.currentTime + 0.03);
+  }
   if (st.sources) st.sources.forEach(s => { try { s.stop(); } catch(e) {} });
   cancelAnimationFrame(st.raf);
   playState[id] = null;
@@ -232,7 +247,8 @@ const ROW_H = 10;
 const PITCH_COUNT = SCALE.length;
 
 function noteY(midi, canvasH) {
-  const idx = SCALE.indexOf(midi);
+  let idx = SCALE.indexOf(midi);
+  if (idx < 0) idx = 0;
   const top = 10, bot = canvasH - 10;
   return bot - (idx / (PITCH_COUNT - 1)) * (bot - top);
 }

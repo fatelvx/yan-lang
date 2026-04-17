@@ -1,6 +1,7 @@
-; 05_meta.yn — 言說自己
+; 05_meta.yn — 言說自己 / Yán interprets Yán
 ;
 ; 用言（Yán）寫一個能執行言的直譯器。
+; A metacircular interpreter: Yán evaluating Yán expressions.
 ;
 ; 核心只有兩個函式：
 ;   yn-eval  — 把表達式求值成結果

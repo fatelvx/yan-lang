@@ -7,10 +7,10 @@
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
-  background: #07070f;
-  color: #889;
-  font-family: 'Courier New', monospace;
-  padding: 60px 80px;
+  background: #060612;
+  color: #c2c8df;
+  font-family: 'Consolas', 'Courier New', monospace;
+  padding: 56px 72px;
   min-height: 100vh;
 }
 
@@ -19,16 +19,16 @@ header {
   margin-bottom: 70px;
 }
 h1 {
-  font-size: 13px;
-  color: #99a;
-  letter-spacing: 5px;
+  font-size: 22px;
+  color: #d6dcf7;
+  letter-spacing: 2px;
   text-transform: uppercase;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 .tagline {
-  font-size: 11px;
-  color: #667;
-  letter-spacing: 2px;
+  font-size: 15px;
+  color: #9ea8cf;
+  letter-spacing: 0.5px;
 }
 
 /* ── 章節 ── */
@@ -36,13 +36,13 @@ h1 {
   margin-bottom: 55px;
 }
 .chapter-title {
-  font-size: 10px;
-  color: #667;
-  letter-spacing: 3px;
+  font-size: 14px;
+  color: #9ea8cf;
+  letter-spacing: 1.5px;
   text-transform: uppercase;
   margin-bottom: 20px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid #1a1a28;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #2b3357;
 }
 
 /* ── 卡片 ── */
@@ -55,8 +55,8 @@ h1 {
   display: flex;
   align-items: baseline;
   gap: 0;
-  padding: 12px 0;
-  border-bottom: 1px solid #0a0a14;
+  padding: 14px 0;
+  border-bottom: 1px solid #171e35;
   text-decoration: none;
   transition: all 0.15s;
   cursor: default;
@@ -65,7 +65,7 @@ a.card {
   cursor: pointer;
 }
 a.card:hover {
-  background: #0d0d1a;
+  background: #0f1730;
   padding-left: 12px;
   margin-left: -12px;
 }
@@ -90,33 +90,33 @@ a.card:hover .card-dot {
   opacity: 1;
 }
 .card-name {
-  font-size: 13px;
-  color: #aab;
-  min-width: 220px;
+  font-size: 18px;
+  color: #e2e8ff;
+  min-width: 260px;
   transition: color 0.15s;
 }
 .card-desc {
-  font-size: 11px;
-  color: #778;
+  font-size: 14px;
+  color: #aeb8dc;
   transition: color 0.15s;
-  line-height: 1.6;
+  line-height: 1.75;
 }
 .card-tag {
-  font-size: 9px;
-  color: #556;
+  font-size: 12px;
+  color: #8d98c2;
   margin-left: auto;
   padding-left: 20px;
-  letter-spacing: 1px;
+  letter-spacing: 0.5px;
   flex-shrink: 0;
 }
 
 /* ── 尾聲 ── */
 footer {
   margin-top: 80px;
-  font-size: 10px;
-  color: #556;
-  letter-spacing: 1px;
-  line-height: 2.2;
+  font-size: 14px;
+  color: #8d98c2;
+  letter-spacing: 0.2px;
+  line-height: 2;
 }
 </style>
 </head>
@@ -131,6 +131,13 @@ footer {
 <div class="chapter">
   <div class="chapter-title">語言</div>
   <div class="cards">
+
+    <a class="card" href="repl.html" style="color:#7aa2ff">
+      <div class="card-dot"></div>
+      <div class="card-name">repl.html</div>
+      <div class="card-desc">Online REPL（瀏覽器版）。可直接輸入言程式碼並執行，免安裝。</div>
+      <div class="card-tag">ONLINE</div>
+    </a>
 
     <div class="card" style="color:#4477cc">
       <div class="card-dot"></div>
@@ -306,9 +313,9 @@ footer {
   </div>
 </div>
 
-<!-- ── 記憶與對話 ── -->
+<!-- ── 記憶 ── -->
 <div class="chapter">
-  <div class="chapter-title">記憶與對話</div>
+  <div class="chapter-title">記憶</div>
   <div class="cards">
 
     <div class="card" style="color:#557766">
@@ -317,13 +324,8 @@ footer {
     </div>
 
     <div class="card" style="color:#557766">
-      <div class="card-name">ai_chat.py</div>
-      <div class="card-desc">言是大腦，Gemini 是嘴巴。Gemini 先分類輸入，言查記憶、算確信度、偵測衝突，再讓 Gemini 翻譯成人話。AI 觀察寫進 journal 標記 ai-observed，conf=0.65。</div>
-    </div>
-
-    <div class="card" style="color:#557766">
-      <div class="card-name">(ai-chat)</div>
-      <div class="card-desc">在 REPL 裡直接啟動 AI 對話介面。需設定 GEMINI_API_KEY 環境變數。記憶跨對話持續，信心值隨時間衰退，釘住的記憶幾乎不會消失。</div>
+      <div class="card-name">with-memory / recall</div>
+      <div class="card-desc">記憶不只是紀錄：可直接進入計算。用 (with-memory name ...) 讓歷史改變行為，(vitality) 反映近期狀態。</div>
     </div>
 
   </div>

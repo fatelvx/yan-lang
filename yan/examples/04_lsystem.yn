@@ -1,6 +1,7 @@
-; 04_lsystem.yn
+; 04_lsystem.yn — L-system in Yán
 ;
 ; 用言（Yán）生成植物。
+; Grow procedural plants with pure Yán code.
 ;
 ; 這個檔案做三件事：
 ;   1. 字串重寫（L-system 規則展開）

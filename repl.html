@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Yán Online REPL</title>
+  <style>
+    :root {
+      --bg: #060612;
+      --panel: #0d1326;
+      --line: #243055;
+      --text: #dbe3ff;
+      --muted: #9aa7d1;
+      --accent: #7aa2ff;
+      --ok: #7ce2a2;
+      --err: #ff7f9a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Consolas, "Courier New", monospace;
+      min-height: 100vh;
+      padding: 28px;
+    }
+    .wrap {
+      max-width: 1100px;
+      margin: 0 auto;
+      display: grid;
+      gap: 16px;
+    }
+    .top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    h1 {
+      margin: 0;
+      font-size: 28px;
+      letter-spacing: 0.5px;
+      color: var(--accent);
+    }
+    .sub {
+      font-size: 14px;
+      color: var(--muted);
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 14px;
+    }
+    textarea {
+      width: 100%;
+      min-height: 180px;
+      resize: vertical;
+      background: #090f20;
+      color: var(--text);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 12px;
+      font-family: inherit;
+      font-size: 16px;
+      line-height: 1.6;
+      outline: none;
+    }
+    textarea:focus {
+      border-color: var(--accent);
+    }
+    .actions {
+      margin-top: 10px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    button {
+      border: 1px solid var(--line);
+      background: #132044;
+      color: #e6ecff;
+      padding: 10px 14px;
+      font-family: inherit;
+      font-size: 14px;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    button:hover { border-color: var(--accent); }
+    .status {
+      font-size: 14px;
+      color: var(--muted);
+      margin-top: 8px;
+      min-height: 20px;
+    }
+    pre {
+      margin: 0;
+      white-space: pre-wrap;
+      word-break: break-word;
+      background: #090f20;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 12px;
+      min-height: 280px;
+      font-size: 15px;
+      line-height: 1.65;
+      color: #dfe6ff;
+    }
+    .ok { color: var(--ok); }
+    .err { color: var(--err); }
+    a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    .hint {
+      font-size: 13px;
+      color: var(--muted);
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <div>
+        <h1>言 Yán — Online REPL</h1>
+        <div class="sub">在瀏覽器裡直接跑言。按 <b>Ctrl+Enter</b> 執行。</div>
+      </div>
+      <div class="sub"><a href="index.html">← 回到首頁</a></div>
+    </div>
+
+    <div class="panel">
+      <textarea id="code">(define (fib n)
+  (if (< n 2) n
+      (+ (fib (- n 1)) (fib (- n 2)))))
+
+(fib 10)
+(vitality)
+(am-i-forgotten? 30)</textarea>
+      <div class="actions">
+        <button id="runBtn">執行</button>
+        <button id="clearBtn">清空輸出</button>
+        <button id="resetBtn">重置環境</button>
+      </div>
+      <div id="status" class="status">初始化中…</div>
+      <div class="hint">提示：`display` 的輸出會顯示在結果區塊。`read-line` 在網頁版不可用。</div>
+    </div>
+
+    <div class="panel">
+      <pre id="out"></pre>
+    </div>
+  </div>
+
+  <script type="module">
+    import { loadPyodide } from "https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.mjs";
+
+    const out = document.getElementById("out");
+    const statusEl = document.getElementById("status");
+    const codeEl = document.getElementById("code");
+    const runBtn = document.getElementById("runBtn");
+    const clearBtn = document.getElementById("clearBtn");
+    const resetBtn = document.getElementById("resetBtn");
+
+    let pyodide = null;
+    let ready = false;
+
+    function append(text, cls = "") {
+      const line = document.createElement("div");
+      if (cls) line.className = cls;
+      line.textContent = text;
+      out.appendChild(line);
+      out.scrollTop = out.scrollHeight;
+    }
+
+    async function loadFileIntoFS(path) {
+      const res = await fetch(path);
+      if (!res.ok) throw new Error(`fetch failed: ${path}`);
+      const text = await res.text();
+      const full = `/workspace/${path}`;
+      const parts = full.split("/");
+      let cur = "";
+      for (let i = 1; i < parts.length - 1; i++) {
+        cur += "/" + parts[i];
+        try { pyodide.FS.mkdir(cur); } catch {}
+      }
+      pyodide.FS.writeFile(full, text, { encoding: "utf8" });
+    }
+
+    async function initYan() {
+      statusEl.textContent = "載入 Pyodide…";
+      pyodide = await loadPyodide();
+      pyodide.setStdout({
+        batched: (msg) => {
+          if (msg.trim()) append(msg);
+        }
+      });
+      pyodide.setStderr({
+        batched: (msg) => append(msg, "err")
+      });
+
+      statusEl.textContent = "載入言核心檔案…";
+      await loadFileIntoFS("yan/yan.py");
+      await loadFileIntoFS("yan/lib/list.yn");
+      await loadFileIntoFS("yan/lib/strings.yn");
+      await loadFileIntoFS("yan/lib/math.yn");
+
+      await pyodide.runPythonAsync(`
+import sys
+sys.path.insert(0, "/workspace")
+import yan.yan as y
+env = y.make_standard_env()
+`);
+
+      ready = true;
+      statusEl.innerHTML = '就緒。輸入程式後按 <b>Ctrl+Enter</b> 或「執行」。';
+      append("Yán online REPL ready.", "ok");
+    }
+
+    async function runCode() {
+      if (!ready) return;
+      const src = codeEl.value;
+      if (!src.trim()) return;
+      runBtn.disabled = true;
+      statusEl.textContent = "執行中…";
+      try {
+        const jsSrc = JSON.stringify(src);
+        const result = await pyodide.runPythonAsync(`
+src = ${jsSrc}
+nodes = y.parse_all(src)
+last = None
+for node in nodes:
+    last = y.eval_yn(node, env)
+if last is None:
+    "__YAN_NONE__"
+else:
+    y.yn_repr(last)
+`);
+        if (result !== "__YAN_NONE__") {
+          append("; " + result, "ok");
+        }
+        statusEl.textContent = "完成。";
+      } catch (e) {
+        append(String(e), "err");
+        statusEl.textContent = "執行失敗。";
+      } finally {
+        runBtn.disabled = false;
+      }
+    }
+
+    async function resetEnv() {
+      if (!ready) return;
+      statusEl.textContent = "重置環境中…";
+      await pyodide.runPythonAsync(`
+env = y.make_standard_env()
+`);
+      append("[env reset]", "ok");
+      statusEl.textContent = "已重置。";
+    }
+
+    runBtn.addEventListener("click", runCode);
+    clearBtn.addEventListener("click", () => out.innerHTML = "");
+    resetBtn.addEventListener("click", resetEnv);
+    codeEl.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && e.ctrlKey) {
+        e.preventDefault();
+        runCode();
+      }
+    });
+
+    initYan().catch((e) => {
+      statusEl.textContent = "初始化失敗。";
+      append(String(e), "err");
+    });
+  </script>
+</body>
+</html>

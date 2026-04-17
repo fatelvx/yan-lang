@@ -194,7 +194,7 @@ function getAC() {
   return ac;
 }
 
-function playNote(freq, when, dur, gain=0.32) {
+function playNote(freq, when, dur, bus, gain=0.32) {
   const ctx = getAC();
   const osc = ctx.createOscillator();
   const g   = ctx.createGain();
@@ -203,7 +203,7 @@ function playNote(freq, when, dur, gain=0.32) {
   g.gain.setValueAtTime(gain, when);
   g.gain.setValueAtTime(gain, when + dur * 0.72);
   g.gain.linearRampToValueAtTime(0.0001, when + dur);
-  osc.connect(g); g.connect(ctx.destination);
+  osc.connect(g); g.connect(bus);
   osc.start(when); osc.stop(when + dur + 0.02);
 }
 
@@ -228,10 +228,14 @@ async function startTrack(id) {
   document.getElementById('btn' + id).textContent = '■ 停止';
   document.getElementById('btn' + id).classList.add('playing');
 
+  const bus = ctx.createGain();
+  bus.gain.setValueAtTime(1.0, ctx.currentTime);
+  bus.connect(ctx.destination);
+
   function scheduleLoop(startAudio, startWall) {
     if (!running) return;
     notes.forEach((n, i) => {
-      playNote(n.freq, startAudio + i * secNote, secNote * 1.4);
+      playNote(n.freq, startAudio + i * secNote, secNote * 1.4, bus);
     });
   }
 
@@ -279,7 +283,7 @@ async function startTrack(id) {
     if (running) setTimeout(schedulerTick, 100);
   }
 
-  state[id] = { running, raf: null, wallStart };
+  state[id] = { running, raf: null, wallStart, bus };
   schedulerTick();
   animate();
 }
@@ -288,6 +292,14 @@ function stopTrack(id) {
   if (!state[id]) return;
   state[id].running = false;
   cancelAnimationFrame(state[id].raf);
+  const ac = getAC();
+  const bus = state[id].bus;
+  if (bus) {
+    bus.gain.cancelScheduledValues(ac.currentTime);
+    bus.gain.setValueAtTime(bus.gain.value, ac.currentTime);
+    bus.gain.linearRampToValueAtTime(0.0001, ac.currentTime + 0.05);
+    setTimeout(() => { try { bus.disconnect(); } catch(e) {} }, 200);
+  }
   delete state[id];
 
   document.getElementById('btn' + id).textContent = '▶ 播放';

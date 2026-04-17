@@ -1,6 +1,7 @@
-; 13_tower.yn — 塔
+; 13_tower.yn — 塔 / The Interpreter Tower
 ;
 ; 同一個計算，在三個層次同時發生。
+; The same computation evaluated across three meta-levels.
 ;
 ; 第一層：言本身執行
 ; 第二層：言執行一個用言寫的言直譯器

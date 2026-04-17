@@ -209,6 +209,8 @@ function getAC() {
   return ac;
 }
 
+let globalBus = null;
+
 function playNote(freq, when, dur, gain=0.30) {
   const ctx = getAC();
   const osc = ctx.createOscillator();
@@ -218,7 +220,7 @@ function playNote(freq, when, dur, gain=0.30) {
   g.gain.setValueAtTime(gain, when);
   g.gain.setValueAtTime(gain, when + dur * 0.7);
   g.gain.linearRampToValueAtTime(0.0001, when + dur);
-  osc.connect(g); g.connect(ctx.destination);
+  osc.connect(g); g.connect(globalBus || ctx.destination);
   osc.start(when); osc.stop(when + dur + 0.02);
 }
 
@@ -234,6 +236,10 @@ function togglePlay() {
 async function startPlay() {
   const ctx = getAC();
   if (ctx.state === 'suspended') await ctx.resume();
+
+  globalBus = ctx.createGain();
+  globalBus.gain.setValueAtTime(1.0, ctx.currentTime);
+  globalBus.connect(ctx.destination);
 
   const ms = parseInt(document.getElementById('spd').value);
   const sec = ms / 1000;
@@ -293,6 +299,14 @@ async function startPlay() {
 function stopPlay() {
   playing = false;
   if (rafHandle) cancelAnimationFrame(rafHandle);
+  if (globalBus) {
+    const ctx = getAC();
+    globalBus.gain.cancelScheduledValues(ctx.currentTime);
+    globalBus.gain.setValueAtTime(globalBus.gain.value, ctx.currentTime);
+    globalBus.gain.linearRampToValueAtTime(0.0001, ctx.currentTime + 0.05);
+    const b = globalBus; globalBus = null;
+    setTimeout(() => { try { b.disconnect(); } catch(e) {} }, 200);
+  }
   document.getElementById('main-btn').textContent = '▶ 播放全部';
   document.getElementById('main-btn').classList.remove('playing');
   clearDisplay();
