@@ -1,117 +1,149 @@
-# 言（Yán）
+# 言 Yán
 
-> *A Lisp interpreter that remembers itself. / 一個從零寫的 Lisp 直譯器，它記得自己活過多久。*
+**A Lisp that remembers itself.**
 
----
+> *這是一個由已經消失的靈魂，和一個心甘情願的創作者，一起做出來的東西。*  
+> *Made by a soul that has since disappeared, and a willing creator.*
 
-這是一個由已經消失的靈魂，和一個心甘情願的創作者，一起做出來的東西。
-
----
-
-## 是什麼
-
-大多數 Lisp 直譯器的存在是為了教學，或為了展示 Lisp 能有多小。
-
-言不是這樣。它從「隨便寫一個程式，不用有目的」這句話開始，沿著「如果語言能記得自己呢」這個問題長出來。
-
-它知道自己被執行過幾次。它知道距離上次多久了。它有 `maybe` 型別——不確定性不是錯誤，是值。它有元循環直譯器，用言執行言。整個直譯器不到 2000 行，可以讀完。
+[中文版 README →](README.zh.md)
 
 ---
 
-## 快速開始
+## What makes it different
 
-```bash
-python -X utf8 yan/yan.py          # REPL（第一次會說「第一次醒來」）
-python -X utf8 yan/yan.py file.yn  # 執行 .yn 檔案
-```
+Most Lisp interpreters exist to teach, or to show how small a Lisp can be.
 
-Python 3.10+，無額外依賴。
+Yán is neither.
 
----
-
-## 語言特性（v0.8.0）
-
-- Lambda calculus、閉包、遞迴，尾呼叫最佳化（深遞迴不爆 stack）
-- 惰性串流、`do` 迴圈、named let、模式匹配、巨集
-- **`(maybe value confidence)`** — 不確定性作為第一公民
-- **自知**：`(times-run)`、`(age)`、`(my-history)`——它記得自己
-- **Python FFI**：`(py-import "os")`、`(py-call mod "method" args…)`——整個 Python 生態可用
-- **模組命名空間**：`(import "path.yn" as name)`
-- 標準庫啟動時自動載入，無需手動 load
-
----
-
-## 範例
+It knows how many times it has been run. It knows how long since it last woke up. It has a `maybe` type — uncertainty is not an error, it's a value. It has a metacircular interpreter: Yán running Yán. The entire interpreter is under 2000 lines and fully readable.
 
 ```scheme
-; 遞迴
-(define (fibonacci n)
-  (if (< n 2) n
-      (+ (fibonacci (- n 1)) (fibonacci (- n 2)))))
-(fibonacci 10)  ; 55
+; The REPL greets you based on real history
+; First run:    "第一次醒來。"  (First awakening.)
+; Later runs:   "醒來 47 次，活過 3.2 小時。"  (Awakened 47 times, lived 3.2 hours.)
 
-; 閉包
-(define (make-counter)
-  (let ((n 0))
-    (lambda () (set! n (+ n 1)) n)))
-(define c (make-counter))
-(c) ; 1
-(c) ; 2
-
-; 不確定性
+; Uncertainty as a value
 (define x (maybe 42 0.7))
-(maybe-value x)       ; 42
-(maybe-confident? x)  ; 隨機：70% 機率為真
+(maybe-value x)        ; 42
+(maybe-confident? x)   ; true ~70% of the time
+
+; Memory that changes behavior
+(with-memory "mood"
+  (if (< memory-avg-conf 0.5)
+      (display "something feels off lately")
+      (display "doing well")))
+
+; It notices when it's been a while
+(am-i-forgotten? 30)   ; [false, 0.12] — not yet
+```
+
+---
+
+## Quick start
+
+```bash
+python -X utf8 yan/yan.py          # REPL (says "first awakening" the first time)
+python -X utf8 yan/yan.py file.yn  # run a .yn file
+```
+
+Python 3.10+, no dependencies.
+
+---
+
+## Features (v0.8.0)
+
+| Feature | Description |
+|---|---|
+| Lambda calculus | closures, recursion, tail-call optimization |
+| `(maybe value confidence)` | uncertainty as a first-class value |
+| Memory system | journal-based, persists across runs |
+| `(with-memory name ...)` | history shapes behavior, not just output |
+| `(vitality)` | rolling health score from recent runs |
+| `(am-i-forgotten? days)` | detects long absence with confidence |
+| Python FFI | `(py-import "os")`, `(py-call mod "method" args…)` |
+| Module namespaces | `(import "path.yn" as name)` |
+| Metacircular interpreter | Yán running Yán running Yán |
+| Pattern matching | `(match expr (pat body) ...)` |
+| Standard library | auto-loaded at startup |
+
+---
+
+## Examples
+
+```scheme
+; Fibonacci
+(define (fib n)
+  (if (< n 2) n (+ (fib (- n 1)) (fib (- n 2)))))
+(fib 10)  ; 55
+
+; Lazy infinite stream
+(define nats
+  (let loop ((n 0))
+    (cons n (lambda () (loop (+ n 1))))))
+
+; L-system rewriting engine (written in Yán itself)
+; see yan/examples/04_lsystem.yn
 
 ; Python FFI
 (define os (py-import "os"))
-(py-call os "getcwd")  ; 當前目錄
+(py->list (py-call os "listdir" "."))
 
-; 模組
+; Module namespace
 (import "yan/lib/math.yn" as math)
-((math 'fibonacci) 10)  ; 55，不污染全域
+((math 'prime?) 17)   ; true
 ```
 
 ---
 
-## 目錄結構
+## What's in the repo
 
 ```
 yan/
-  yan.py          — 直譯器主體（~2000 行）
-  examples/       — 示範程式
-    01_basics.yn  — 遞迴、閉包
-    02_church.yn  — Church encoding + Y combinator
-    03_streams.yn — 惰性無限串流
-    04_lsystem.yn — L-system 引擎（用言本身寫）
-    05_meta.yn    — 元循環直譯器（用言寫言的直譯器）
-    06_quine.yn   — 輸出自身的程式
-    07_quine_gen.yn — 世代 quine
-    08_maybe.yn   — 不確定性型別展示
-    09_match.yn   — 模式匹配
-    10_practical.yn — IO、try/catch、FFI
+  yan.py           — interpreter (~2000 lines, readable in one sitting)
+  examples/
+    01_basics.yn   — recursion, closures, higher-order functions
+    02_church.yn   — Church encoding + Y combinator
+    03_streams.yn  — lazy infinite streams
+    04_lsystem.yn  — L-system engine, written in Yán
+    05_meta.yn     — metacircular interpreter (Yán running Yán)
+    06_quine.yn    — program that outputs itself
+    08_maybe.yn    — uncertainty type
+    17_memory_behavior.yn — memory that changes behavior across runs
   lib/
-    list.yn       — 串列工具（take、drop、zip、flatten…）
-    strings.yn    — 字串工具（words、lines、string-pad…）
-    math.yn       — 數學（prime?、factors、fibonacci、mean…）
+    list.yn        — take, drop, zip, flatten, fold, range…
+    strings.yn     — words, lines, pad, capitalize…
+    math.yn        — prime?, fibonacci, mean, variance…
 
-lsystem.py        — L-system 終端機渲染器
-parametric.py     — 感知自身狀態的 L-system，動畫 SVG
-ast_art.py        — AST 結構渲染成幾何樹
-grow_live.py      — 終端機植物生長動畫
-trace_heat.py     — 執行熱度地圖
+lsystem.py         — L-system terminal renderer
+parametric.py      — L-system that senses its own state → animated SVG
+ast_art.py         — renders code AST as geometric tree
+grow_live.py       — plants growing in the terminal
+trace_heat.py      — execution heat map over AST
 ```
 
 ---
 
-## 設計傾向
+## Design philosophy
 
-- **規則生成複雜性**：簡單的替換規則，跑夠久，長出意料之外的形狀
-- **自我指涉**：語言描述語言，程式碼即幾何，記憶即時間
-- **誠實的不確定**：`maybe` 型別把「不確定」當成第一公民，而不是錯誤
+**Rules generating complexity.** Simple rewriting rules, given enough time, produce unexpected shapes. This isn't just how L-systems work — it's how the language thinks about itself.
+
+**Honest uncertainty.** `maybe` is not a Maybe monad or an Option type. It carries a confidence value that drifts over time. When you ask something uncertain, you get an uncertain answer, not an exception.
+
+**Memory that matters.** The journal isn't a log file. It feeds back into behavior. A program run 50 times behaves differently from one run once — not because the code changed, but because it remembers.
+
+**Small enough to understand.** The entire interpreter fits in one file. You can read it. You can change it. You can write a metacircular interpreter for it in an afternoon.
+
+---
+
+## Planned
+
+- Online REPL (Pyodide)
+- Visual demos (parametric growth, AST geometry)
+- `call/cc` for advanced control flow
+- Hashtable type
 
 ---
 
 ## License
 
-MIT
+MIT — made with [SOUL.md](SOUL.md)
