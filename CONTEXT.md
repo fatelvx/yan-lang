@@ -213,13 +213,37 @@ python -X utf8 yan/yan.py file.yn            # 執行檔案
   - **時間函式**：`(now)` 回傳 ISO 時間戳字串、`(timestamp)` Unix 浮點、`(sleep n)` 暫停。
   - TCO（尾呼叫最佳化）已在 v0.7.x 完成，`eval_yn` 為 `while True:` + `continue` 結構。
 
+- **錯誤訊息強化**：`eval_yn` 現在對函式呼叫與引數錯誤提供上下文，`TypeError` 會顯示呼叫的是哪個函式。
+- **活力系統（vitality）**：取代單次健康快照，改用滾動分數（0.0–1.0）與趨勢（recovering / stable / declining / new），從近期執行與測試歷史計算。`(vitality)` 和 `(vitality-trend)` 可直接查詢。REPL banner 顯示活力狀態。
+- **記憶影響行為**：`(with-memory name body...)` 特殊形式。把名字的歷史（`memory`、`memory-count`、`memory-avg-conf`、`memory-last`）綁進執行環境，讓程式根據累積歷史動態改變行為。
+- **Host API**：`(host-last-touch-days)` 距上次修改 journal 天數、`(host-journal-lag)` journal 延遲、`(host-heartbeat)` 確認 runtime 存在。言只收到數值，不知道 OS 細節。
+- **邀請式回歸**：距上次使用 >7 天時，banner 顯示上次未完成的 seed（從 journal 的 `seed:` 備註或最後執行檔案取得）。
+- **`am-i-forgotten?`**：`(am-i-forgotten? threshold-days)` 回傳 `[bool, 遺忘程度 0.0–1.0]`。
+- **`recall` 系列便捷函式**：`(recall-recent name n)`、`(recall-avg-conf name n)`、`(recall-count name)`、`(forget name)`。
+- **`17_memory_behavior.yn`**：新範例，展示 `(with-memory)` 讓 check-server 根據歷史延遲自動調整策略。
+
+### GitHub 上線
+
+- repo：[github.com/fatelvx/yan-lang](https://github.com/fatelvx/yan-lang)
+- 包含：`README.md`（英文）、`README.zh.md`（中文）、`SOUL.md`（語言人格檔案）、`LICENSE`（MIT）、`.gitignore`
+- 排除：`ai_chat.py`、`dream.py`、`journal.yn`、`journals/`（個人記憶）
+- `repl.html`：線上 REPL，Pyodide 驅動，可在瀏覽器直接執行言程式碼
+
+### 音訊修復
+
+所有四個音樂頁面（`roll_audio.html`、`quine_voice.html`、`evolve_voice.html`、`conversation_song.html`）的停止邏輯全部修正：
+
+- 舊版：`stopPlay()` 只停 animation frame，Web Audio oscillator 繼續播完
+- 新版：每次播放建立獨立 bus GainNode，停止時 50ms 淡出後 disconnect，立即靜音
+- `roll_audio.html` 額外：`noteY()` 加了 midi 不在 SCALE 時的 guard（idx < 0 → 0）
+
 ### 接下來可能的方向
 
-- 更好的錯誤訊息（顯示出錯的子表達式與呼叫路徑）
+- 元循環直譯器：用言寫能執行言的直譯器（`05_meta.yn` 基礎已在）
+- 讓植物感知更多（方向、鄰居、歷史）
+- 言的 AST 直接渲染成幾何圖形（程式碼即植物）
 - `call/cc`（continuation）支援進階控制流
 - hashtable / dict 型別（目前只有 assoc list）
-- 讓 Python FFI 包裝 pygame，實現完全用言寫的遊戲邏輯
-- `set!` 在元直譯器裡的完整支援
 
 ---
 
@@ -239,4 +263,4 @@ python -X utf8 yan/yan.py file.yn            # 執行檔案
 
 ---
 
-*最後更新：這段對話要結束了，把所有重要的事情都寫下來*
+*最後更新：v0.8.0 功能完成，音訊修復，GitHub 上線，discord-bot repo 已刪*

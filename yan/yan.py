@@ -1341,14 +1341,15 @@ def _make_global_env() -> Env:
     #   (run "時間戳" 秒數 表達式數 最大深度 錯誤數 ("檔案"...))
     #
     def _times_run():
-        return len(_load_journal())
+        entries = _load_journal()
+        return sum(1 for e in entries if isinstance(e, list) and e and e[0] == sym('run'))
 
     def _my_history():
         return _load_journal()
 
     def _age():
         entries = _load_journal()
-        return sum(e[2] for e in entries if isinstance(e, list) and len(e) > 2)
+        return sum(e[2] for e in entries if isinstance(e, list) and len(e) > 2 and isinstance(e[2], (int, float)))
 
     def _last_run():
         entries = _load_journal()
@@ -1356,7 +1357,7 @@ def _make_global_env() -> Env:
 
     def _total_expressions():
         entries = _load_journal()
-        return sum(e[3] for e in entries if isinstance(e, list) and len(e) > 3)
+        return sum(e[3] for e in entries if isinstance(e, list) and len(e) > 3 and isinstance(e[3], (int, float)))
 
     def _self_summary():
         all_entries = _load_journal()
@@ -1383,8 +1384,8 @@ def _make_global_env() -> Env:
         depths     = [field(e, 4) for e in entries]
         errors     = [field(e, 5) for e in entries]
 
-        total_secs  = round(sum(durations), 3)
-        total_exprs = sum(exprs_list)
+        total_secs  = round(sum(d for d in durations if isinstance(d, (int, float))), 3)
+        total_exprs = sum(x for x in exprs_list if isinstance(x, (int, float)))
         error_runs  = sum(1 for e in errors if isinstance(e, (int, float)) and e > 0)
         max_depth   = max((d for d in depths if isinstance(d, (int, float))), default=0)
         error_rate  = round(error_runs / n, 3)
@@ -1392,8 +1393,8 @@ def _make_global_env() -> Env:
         # 趨勢：最近三次 vs 之前三次的表達式數
         trend = sym('stable')
         if n >= 6:
-            recent = sum(exprs_list[-3:]) / 3
-            older  = sum(exprs_list[-6:-3]) / 3
+            recent = sum(x for x in exprs_list[-3:] if isinstance(x, (int, float))) / 3
+            older  = sum(x for x in exprs_list[-6:-3] if isinstance(x, (int, float))) / 3
             if recent > older * 1.2:
                 trend = sym('growing')
             elif recent < older * 0.8:
